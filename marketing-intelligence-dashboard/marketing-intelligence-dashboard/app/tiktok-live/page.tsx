@@ -4,6 +4,7 @@ import TikTokLiveKpiCard from "@/components/TikTokLiveKpiCard";
 import TikTokLivePerformanceChart from "@/components/TikTokLivePerformanceChart";
 import TikTokLiveEngagementChart from "@/components/TikTokLiveEngagementChart";
 import TikTokLiveWatchTime from "@/components/TikTokLiveWatchTime";
+import TikTokLiveSessionsTable from "@/components/TikTokLiveSessionsTable";
 
 export const dynamic = "force-dynamic";
 
@@ -173,17 +174,10 @@ export default async function TikTokLivePage() {
         />
 
 
-        <section className="panel" style={{ marginTop: 16 }}>
-          <h3>TikTok Live Dashboard</h3>
+        <TikTokLiveSessionsTable
+          data={sessions}
+        />
 
-          <p>
-            Connected Data:
-            <br />
-            {sessions.length} live sessions
-            <br />
-            {leads.length} leads collected
-          </p>
-        </section>
 
       </main>
     </div>
