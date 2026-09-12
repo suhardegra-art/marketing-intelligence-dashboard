@@ -2,6 +2,7 @@ import Sidebar from "@/components/Sidebar";
 import { getTikTokLiveData } from "@/lib/tiktok-live";
 import TikTokLiveKpiCard from "@/components/TikTokLiveKpiCard";
 import TikTokLivePerformanceChart from "@/components/TikTokLivePerformanceChart";
+import TikTokLiveEngagementChart from "@/components/TikTokLiveEngagementChart";
 
 export const dynamic = "force-dynamic";
 
@@ -38,6 +39,11 @@ export default async function TikTokLivePage() {
   );
 
   const totalLeads = leads.length;
+
+  const engagementRate =
+    totalViews > 0
+      ? ((totalLikes + totalComments + totalShares) / totalViews) * 100
+      : 0;
 
   const chartData = sessions.map((item: any) => ({
     live_date: item.live_date,
@@ -93,6 +99,7 @@ export default async function TikTokLivePage() {
           </div>
         </header>
 
+
         <section
           style={{
             borderRadius: 18,
@@ -132,6 +139,14 @@ export default async function TikTokLivePage() {
 
 
         <TikTokLivePerformanceChart data={chartData} />
+
+
+        <TikTokLiveEngagementChart
+          likes={totalLikes}
+          comments={totalComments}
+          shares={totalShares}
+          engagementRate={engagementRate}
+        />
 
 
         <section className="panel" style={{ marginTop: 16 }}>
