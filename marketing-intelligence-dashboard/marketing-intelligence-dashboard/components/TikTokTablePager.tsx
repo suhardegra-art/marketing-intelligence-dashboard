@@ -152,26 +152,32 @@ export default function TikTokTablePager() {
 
     if (!panel || !body || !table || !tableWrap) return;
 
+    // Preserve narrowed non-null references for nested callbacks.
+    const panelElement = panel;
+    const bodyElement = body;
+    const tableElement = table;
+    const tableWrapElement = tableWrap;
+
     const originalRows = Array.from(
-      body.querySelectorAll<HTMLTableRowElement>("tr")
+      bodyElement.querySelectorAll<HTMLTableRowElement>("tr")
     );
 
     originalRows.forEach((row, index) => {
       row.dataset.originalOrder = String(index);
     });
 
-    let pagerMount = panel.querySelector<HTMLElement>(
+    let pagerMount = panelElement.querySelector<HTMLElement>(
       "[data-tiktok-table-pager]"
     );
 
     if (!pagerMount) {
       pagerMount = document.createElement("div");
       pagerMount.dataset.tiktokTablePager = "true";
-      tableWrap.insertAdjacentElement("afterend", pagerMount);
+      tableWrapElement.insertAdjacentElement("afterend", pagerMount);
     }
 
     const headerCells = Array.from(
-      table.querySelectorAll<HTMLTableCellElement>("thead th")
+      tableElement.querySelectorAll<HTMLTableCellElement>("thead th")
     );
 
     const createdControls: HTMLSelectElement[] = [];
@@ -186,7 +192,7 @@ export default function TikTokTablePager() {
 
     function applySort(config: SortConfig, direction: SortDirection) {
       const rows = Array.from(
-        body.querySelectorAll<HTMLTableRowElement>("tr")
+        bodyElement.querySelectorAll<HTMLTableRowElement>("tr")
       );
 
       if (direction === "default") {
@@ -215,7 +221,7 @@ export default function TikTokTablePager() {
         });
       }
 
-      rows.forEach((row) => body.appendChild(row));
+      rows.forEach((row) => bodyElement.appendChild(row));
 
       setCurrentPage(1);
       setActiveSort(
@@ -294,14 +300,14 @@ export default function TikTokTablePager() {
       createdControls.push(select);
     });
 
-    setTablePanel(panel);
-    setTableBody(body);
+    setTablePanel(panelElement);
+    setTableBody(bodyElement);
     setMountNode(pagerMount);
     setTotalRows(originalRows.length);
     setCurrentPage(1);
 
     return () => {
-      body.querySelectorAll<HTMLTableRowElement>("tr").forEach((row) => {
+      bodyElement.querySelectorAll<HTMLTableRowElement>("tr").forEach((row) => {
         row.style.display = "";
       });
 
@@ -311,7 +317,7 @@ export default function TikTokTablePager() {
             Number(a.dataset.originalOrder ?? 0) -
             Number(b.dataset.originalOrder ?? 0)
         )
-        .forEach((row) => body.appendChild(row));
+        .forEach((row) => bodyElement.appendChild(row));
 
       createdControls.forEach((control) => control.remove());
 
