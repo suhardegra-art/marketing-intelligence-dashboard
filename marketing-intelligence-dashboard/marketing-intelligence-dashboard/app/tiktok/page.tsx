@@ -301,34 +301,6 @@ export default async function TikTokPage({ searchParams }: TikTokPageProps) {
           </div>
         </section>
 
-        {!data.connected ? (
-          <section className="panel" style={{ marginBottom: 16 }}>
-            <h3 style={{ marginTop: 0 }}>TikTok data unavailable</h3>
-            <p style={{ color: "#7a839d", marginBottom: 16 }}>{data.message}</p>
-            <a
-              href="/api/tiktok/connect"
-              style={{
-                display: "inline-flex",
-                background: "#111827",
-                color: "white",
-                textDecoration: "none",
-                padding: "10px 15px",
-                borderRadius: 9,
-                fontWeight: 800,
-                fontSize: 12
-              }}
-            >
-              Connect TikTok
-            </a>
-          </section>
-        ) : (
-          <SyncAllTikTokButton
-            currentLoaded={data.loadedVideos}
-            expectedTotal={data.videoCount}
-          />
-        )}
-
-<TikTokSyncMonitoring />
 
         <section
           style={{
@@ -637,6 +609,37 @@ export default async function TikTokPage({ searchParams }: TikTokPageProps) {
             selection automatically compares the chosen period with the
             immediately preceding period of equal length.
           </p>
+        </section>
+
+        <section className="panel" style={{ marginBottom: 16 }}>
+          {!data.connected ? (
+            <section className="panel" style={{ marginBottom: 16 }}>
+              <h3 style={{ marginTop: 0 }}>TikTok data unavailable</h3>
+              <p style={{ color: "#7a839d", marginBottom: 16 }}>{data.message}</p>
+              <a
+                href="/api/tiktok/connect"
+                style={{
+                  display: "inline-flex",
+                  background: "#111827",
+                  color: "white",
+                  textDecoration: "none",
+                  padding: "10px 15px",
+                  borderRadius: 9,
+                  fontWeight: 800,
+                  fontSize: 12
+                }}
+              >
+                Connect TikTok
+              </a>
+            </section>
+          ) : (
+            <SyncAllTikTokButton
+              currentLoaded={data.loadedVideos}
+              expectedTotal={data.videoCount}
+            />
+          )}
+
+          <TikTokSyncMonitoring />
         </section>
 
         <footer>TikTok Performance • Live Supabase Data</footer>
