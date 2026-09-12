@@ -15,6 +15,12 @@ type SortConfig = {
   descLabel: string;
 };
 
+type SortControl = {
+  columnIndex: number;
+  details: HTMLDetailsElement;
+  summary: HTMLElement;
+};
+
 const SORTABLE_COLUMNS: SortConfig[] = [
   {
     columnIndex: 0,
@@ -152,7 +158,6 @@ export default function TikTokTablePager() {
 
     if (!panel || !body || !table || !tableWrap) return;
 
-    // Preserve narrowed non-null references for nested callbacks.
     const panelElement = panel;
     const bodyElement = body;
     const tableElement = table;
@@ -180,12 +185,13 @@ export default function TikTokTablePager() {
       tableElement.querySelectorAll<HTMLTableCellElement>("thead th")
     );
 
-    const createdControls: HTMLSelectElement[] = [];
+    const createdControls: SortControl[] = [];
 
     function resetOtherControls(activeColumnIndex: number) {
       createdControls.forEach((control) => {
-        if (Number(control.dataset.columnIndex) !== activeColumnIndex) {
-          control.value = "default";
+        if (control.columnIndex !== activeColumnIndex) {
+          control.summary.textContent = "↕";
+          control.details.open = false;
         }
       });
     }
@@ -239,65 +245,140 @@ export default function TikTokTablePager() {
       const header = headerCells[config.columnIndex];
       if (!header) return;
 
-      const existing =
-        header.querySelector<HTMLSelectElement>(
-          "[data-tiktok-sort-control]"
-        );
+      const existing = header.querySelector<HTMLElement>(
+        "[data-tiktok-sort-control]"
+      );
 
       if (existing) existing.remove();
 
       header.style.whiteSpace = "nowrap";
 
-      const select = document.createElement("select");
-      select.dataset.tiktokSortControl = "true";
-      select.dataset.columnIndex = String(config.columnIndex);
-      select.setAttribute(
+      const details = document.createElement("details");
+      details.dataset.tiktokSortControl = "true";
+      details.style.display = "inline-block";
+      details.style.position = "relative";
+      details.style.marginLeft = "6px";
+      details.style.verticalAlign = "middle";
+
+      const summary = document.createElement("summary");
+      summary.textContent = "↕";
+      summary.title = "Sort column";
+      summary.setAttribute(
         "aria-label",
         `Sort ${header.textContent?.trim() ?? "column"}`
       );
-      select.title = "Sort column";
-      select.value = "default";
 
-      const defaultOption = document.createElement("option");
-      defaultOption.value = "default";
-      defaultOption.textContent = "Sort";
-
-      const ascOption = document.createElement("option");
-      ascOption.value = "asc";
-      ascOption.textContent = config.ascLabel;
-
-      const descOption = document.createElement("option");
-      descOption.value = "desc";
-      descOption.textContent = config.descLabel;
-
-      select.append(defaultOption, ascOption, descOption);
-
-      Object.assign(select.style, {
-        marginLeft: "6px",
-        height: "24px",
-        maxWidth: "30px",
+      Object.assign(summary.style, {
+        width: "26px",
+        height: "26px",
         border: "1px solid #dce1ef",
-        borderRadius: "6px",
+        borderRadius: "7px",
         background: "#fff",
         color: "#59617a",
-        fontSize: "10px",
         cursor: "pointer",
-        verticalAlign: "middle",
-        padding: "0 2px"
+        display: "inline-grid",
+        placeItems: "center",
+        fontSize: "13px",
+        fontWeight: "900",
+        lineHeight: "1",
+        listStyle: "none",
+        userSelect: "none"
       });
 
-      select.addEventListener("change", () => {
-        const direction = select.value as SortDirection;
+      const menu = document.createElement("div");
 
-        if (direction !== "default") {
-          resetOtherControls(config.columnIndex);
+      Object.assign(menu.style, {
+        position: "absolute",
+        top: "32px",
+        right: "0",
+        minWidth: "170px",
+        padding: "6px",
+        border: "1px solid #e1e5ef",
+        borderRadius: "10px",
+        background: "#fff",
+        boxShadow: "0 12px 28px rgba(31,40,79,.16)",
+        zIndex: "50"
+      });
+
+      const options: Array<{
+        direction: SortDirection;
+        label: string;
+        icon: string;
+      }> = [
+        {
+          direction: "default",
+          label: "Default order",
+          icon: "↕"
+        },
+        {
+          direction: "asc",
+          label: config.ascLabel,
+          icon: "↑"
+        },
+        {
+          direction: "desc",
+          label: config.descLabel,
+          icon: "↓"
         }
+      ];
 
-        applySort(config, direction);
+      options.forEach((option) => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.textContent = option.label;
+
+        Object.assign(button.style, {
+          width: "100%",
+          border: "0",
+          background: "transparent",
+          color: "#4f5870",
+          textAlign: "left",
+          padding: "9px 10px",
+          borderRadius: "7px",
+          cursor: "pointer",
+          fontSize: "11px",
+          fontWeight: "700"
+        });
+
+        button.addEventListener("mouseenter", () => {
+          button.style.background = "#f4f6fb";
+        });
+
+        button.addEventListener("mouseleave", () => {
+          button.style.background = "transparent";
+        });
+
+        button.addEventListener("click", () => {
+          if (option.direction !== "default") {
+            resetOtherControls(config.columnIndex);
+          }
+
+          summary.textContent = option.icon;
+          details.open = false;
+          applySort(config, option.direction);
+        });
+
+        menu.appendChild(button);
       });
 
-      header.appendChild(select);
-      createdControls.push(select);
+      details.addEventListener("toggle", () => {
+        if (!details.open) return;
+
+        createdControls.forEach((control) => {
+          if (control.details !== details) {
+            control.details.open = false;
+          }
+        });
+      });
+
+      details.append(summary, menu);
+      header.appendChild(details);
+
+      createdControls.push({
+        columnIndex: config.columnIndex,
+        details,
+        summary
+      });
     });
 
     setTablePanel(panelElement);
@@ -319,7 +400,7 @@ export default function TikTokTablePager() {
         )
         .forEach((row) => bodyElement.appendChild(row));
 
-      createdControls.forEach((control) => control.remove());
+      createdControls.forEach((control) => control.details.remove());
 
       if (pagerMount?.parentNode) {
         pagerMount.parentNode.removeChild(pagerMount);
