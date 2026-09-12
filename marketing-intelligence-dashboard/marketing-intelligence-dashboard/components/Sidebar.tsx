@@ -47,11 +47,12 @@ export default function Sidebar({ activeItem = "Dashboard" }: { activeItem?: str
         {groups.map((group) => (
           <div className="nav-group" key={group.label}>
             <p>{group.label}</p>
+
             {group.items.map((item) =>
-              item === "TikTok" ? (
+              item === "TikTok" || item === "TikTok Live" ? (
                 <Link
-                  href="/tiktok"
-                  className={`nav-item ${activeItem === "TikTok" ? "active" : ""}`}
+                  href={item === "TikTok" ? "/tiktok" : "/tiktok-live"}
+                  className={`nav-item ${activeItem === item ? "active" : ""}`}
                   style={{ textDecoration: "none" }}
                   key={item}
                 >
