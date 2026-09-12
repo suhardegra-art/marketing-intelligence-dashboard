@@ -1,6 +1,7 @@
 import Sidebar from "@/components/Sidebar";
 import { getTikTokLiveData } from "@/lib/tiktok-live";
 import TikTokLiveKpiCard from "@/components/TikTokLiveKpiCard";
+import TikTokLivePerformanceChart from "@/components/TikTokLivePerformanceChart";
 
 export const dynamic = "force-dynamic";
 
@@ -12,10 +13,14 @@ export default async function TikTokLivePage() {
     0
   );
 
-  const peakViewers = Math.max(
-    ...sessions.map((item: any) => Number(item.peak_viewers || 0)),
-    0
-  );
+  const peakViewers =
+    sessions.length > 0
+      ? Math.max(
+          ...sessions.map((item: any) =>
+            Number(item.peak_viewers || 0)
+          )
+        )
+      : 0;
 
   const totalLikes = sessions.reduce(
     (sum: number, item: any) => sum + Number(item.likes || 0),
@@ -33,6 +38,12 @@ export default async function TikTokLivePage() {
   );
 
   const totalLeads = leads.length;
+
+  const chartData = sessions.map((item: any) => ({
+    live_date: item.live_date,
+    views: Number(item.views || 0),
+    peak_viewers: Number(item.peak_viewers || 0),
+  }));
 
   const kpis = [
     {
@@ -118,6 +129,9 @@ export default async function TikTokLivePage() {
             />
           ))}
         </section>
+
+
+        <TikTokLivePerformanceChart data={chartData} />
 
 
         <section className="panel" style={{ marginTop: 16 }}>
