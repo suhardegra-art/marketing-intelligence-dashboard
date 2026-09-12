@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 const groups = [
   {
     label: "ONLINE",
@@ -21,7 +23,7 @@ const groups = [
   }
 ];
 
-export default function Sidebar() {
+export default function Sidebar({ activeItem = "Dashboard" }: { activeItem?: string }) {
   return (
     <aside className="sidebar">
       <div className="sidebar-brand">
@@ -33,13 +35,35 @@ export default function Sidebar() {
       </div>
 
       <nav>
-        <button className="nav-item active"><span>▦</span> Dashboard</button>
+        <Link
+          href="/dashboard"
+          className={`nav-item ${activeItem === "Dashboard" ? "active" : ""}`}
+          style={{ textDecoration: "none" }}
+        >
+          <span>▦</span> Dashboard
+        </Link>
+
         {groups.map((group) => (
           <div className="nav-group" key={group.label}>
             <p>{group.label}</p>
-            {group.items.map((item) => (
-              <button className="nav-item" key={item}><span>•</span>{item}</button>
-            ))}
+            {group.items.map((item) =>
+              item === "TikTok" ? (
+                <Link
+                  href="/tiktok"
+                  className={`nav-item ${activeItem === "TikTok" ? "active" : ""}`}
+                  style={{ textDecoration: "none" }}
+                  key={item}
+                >
+                  <span>•</span>
+                  {item}
+                </Link>
+              ) : (
+                <button className="nav-item" key={item}>
+                  <span>•</span>
+                  {item}
+                </button>
+              )
+            )}
           </div>
         ))}
       </nav>

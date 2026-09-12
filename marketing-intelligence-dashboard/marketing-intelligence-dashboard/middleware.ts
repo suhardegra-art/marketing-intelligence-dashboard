@@ -4,9 +4,15 @@ import { verifySessionToken } from "@/lib/session";
 export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
   const token = request.cookies.get("mi_session")?.value;
-  const isAuthenticated = await verifySessionToken(token, process.env.SESSION_SECRET);
+  const isAuthenticated = await verifySessionToken(
+    token,
+    process.env.SESSION_SECRET
+  );
 
-  if (pathname.startsWith("/dashboard") && !isAuthenticated) {
+  const isProtectedDashboard =
+    pathname.startsWith("/dashboard") || pathname.startsWith("/tiktok");
+
+  if (isProtectedDashboard && !isAuthenticated) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
 
@@ -18,5 +24,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/dashboard/:path*", "/login"]
+  matcher: ["/dashboard/:path*", "/tiktok/:path*", "/login"]
 };
