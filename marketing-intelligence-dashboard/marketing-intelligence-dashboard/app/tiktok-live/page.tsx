@@ -7,6 +7,7 @@ import TikTokLiveWatchTime from "@/components/TikTokLiveWatchTime";
 import TikTokLiveSessionsTable from "@/components/TikTokLiveSessionsTable";
 import TikTokLiveLeadKpi from "@/components/TikTokLiveLeadKpi";
 import TikTokLiveLeadTable from "@/components/TikTokLiveLeadTable";
+import TikTokLiveConversionFunnel from "@/components/TikTokLiveConversionFunnel";
 
 export const dynamic = "force-dynamic";
 
@@ -191,6 +192,14 @@ export default async function TikTokLivePage() {
 
         <TikTokLiveLeadKpi
           total={totalLeads}
+          qualified={qualifiedLeads}
+          spk={spkGenerated}
+        />
+
+
+        <TikTokLiveConversionFunnel
+          views={totalViews}
+          leads={totalLeads}
           qualified={qualifiedLeads}
           spk={spkGenerated}
         />
