@@ -6,6 +6,60 @@ import { usePathname } from "next/navigation";
 
 const PAGE_SIZE = 100;
 
+type SortDirection = "default" | "asc" | "desc";
+
+type SortConfig = {
+  columnIndex: number;
+  type: "date" | "text" | "number" | "percent";
+  ascLabel: string;
+  descLabel: string;
+};
+
+const SORTABLE_COLUMNS: SortConfig[] = [
+  {
+    columnIndex: 0,
+    type: "date",
+    ascLabel: "Oldest → Newest",
+    descLabel: "Newest → Oldest"
+  },
+  {
+    columnIndex: 1,
+    type: "text",
+    ascLabel: "A → Z",
+    descLabel: "Z → A"
+  },
+  {
+    columnIndex: 2,
+    type: "number",
+    ascLabel: "Lowest → Highest",
+    descLabel: "Highest → Lowest"
+  },
+  {
+    columnIndex: 3,
+    type: "number",
+    ascLabel: "Lowest → Highest",
+    descLabel: "Highest → Lowest"
+  },
+  {
+    columnIndex: 4,
+    type: "number",
+    ascLabel: "Lowest → Highest",
+    descLabel: "Highest → Lowest"
+  },
+  {
+    columnIndex: 5,
+    type: "number",
+    ascLabel: "Lowest → Highest",
+    descLabel: "Highest → Lowest"
+  },
+  {
+    columnIndex: 6,
+    type: "percent",
+    ascLabel: "Lowest → Highest",
+    descLabel: "Highest → Lowest"
+  }
+];
+
 function buildVisiblePages(currentPage: number, totalPages: number) {
   if (totalPages <= 7) {
     return Array.from({ length: totalPages }, (_, index) => index + 1);
@@ -28,6 +82,39 @@ function buildVisiblePages(currentPage: number, totalPages: number) {
   return pages;
 }
 
+function parseNumeric(value: string) {
+  const cleaned = value
+    .replace(/,/g, "")
+    .replace(/%/g, "")
+    .replace(/[^\d.-]/g, "");
+
+  const number = Number(cleaned);
+  return Number.isFinite(number) ? number : 0;
+}
+
+function parseDate(value: string) {
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function getCellValue(
+  row: HTMLTableRowElement,
+  config: SortConfig
+): string | number {
+  const text =
+    row.cells[config.columnIndex]?.textContent?.trim() ?? "";
+
+  if (config.type === "number" || config.type === "percent") {
+    return parseNumeric(text);
+  }
+
+  if (config.type === "date") {
+    return parseDate(text);
+  }
+
+  return text.toLocaleLowerCase();
+}
+
 export default function TikTokTablePager() {
   const pathname = usePathname();
   const [mountNode, setMountNode] = useState<HTMLElement | null>(null);
@@ -35,6 +122,11 @@ export default function TikTokTablePager() {
   const [tablePanel, setTablePanel] = useState<HTMLElement | null>(null);
   const [totalRows, setTotalRows] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
+  const [sortVersion, setSortVersion] = useState(0);
+  const [activeSort, setActiveSort] = useState<{
+    columnIndex: number;
+    direction: SortDirection;
+  } | null>(null);
 
   useEffect(() => {
     if (pathname !== "/tiktok") return;
@@ -52,10 +144,21 @@ export default function TikTokTablePager() {
     const body =
       panel?.querySelector<HTMLTableSectionElement>("table tbody") ?? null;
 
+    const table =
+      panel?.querySelector<HTMLTableElement>("table") ?? null;
+
     const tableWrap =
       panel?.querySelector<HTMLElement>(".table-wrap") ?? null;
 
-    if (!panel || !body || !tableWrap) return;
+    if (!panel || !body || !table || !tableWrap) return;
+
+    const originalRows = Array.from(
+      body.querySelectorAll<HTMLTableRowElement>("tr")
+    );
+
+    originalRows.forEach((row, index) => {
+      row.dataset.originalOrder = String(index);
+    });
 
     let pagerMount = panel.querySelector<HTMLElement>(
       "[data-tiktok-table-pager]"
@@ -67,16 +170,150 @@ export default function TikTokTablePager() {
       tableWrap.insertAdjacentElement("afterend", pagerMount);
     }
 
+    const headerCells = Array.from(
+      table.querySelectorAll<HTMLTableCellElement>("thead th")
+    );
+
+    const createdControls: HTMLSelectElement[] = [];
+
+    function resetOtherControls(activeColumnIndex: number) {
+      createdControls.forEach((control) => {
+        if (Number(control.dataset.columnIndex) !== activeColumnIndex) {
+          control.value = "default";
+        }
+      });
+    }
+
+    function applySort(config: SortConfig, direction: SortDirection) {
+      const rows = Array.from(
+        body.querySelectorAll<HTMLTableRowElement>("tr")
+      );
+
+      if (direction === "default") {
+        rows.sort(
+          (a, b) =>
+            Number(a.dataset.originalOrder ?? 0) -
+            Number(b.dataset.originalOrder ?? 0)
+        );
+      } else {
+        rows.sort((a, b) => {
+          const aValue = getCellValue(a, config);
+          const bValue = getCellValue(b, config);
+
+          let comparison = 0;
+
+          if (typeof aValue === "number" && typeof bValue === "number") {
+            comparison = aValue - bValue;
+          } else {
+            comparison = String(aValue).localeCompare(String(bValue), undefined, {
+              numeric: true,
+              sensitivity: "base"
+            });
+          }
+
+          return direction === "asc" ? comparison : -comparison;
+        });
+      }
+
+      rows.forEach((row) => body.appendChild(row));
+
+      setCurrentPage(1);
+      setActiveSort(
+        direction === "default"
+          ? null
+          : {
+              columnIndex: config.columnIndex,
+              direction
+            }
+      );
+      setSortVersion((value) => value + 1);
+    }
+
+    SORTABLE_COLUMNS.forEach((config) => {
+      const header = headerCells[config.columnIndex];
+      if (!header) return;
+
+      const existing =
+        header.querySelector<HTMLSelectElement>(
+          "[data-tiktok-sort-control]"
+        );
+
+      if (existing) existing.remove();
+
+      header.style.whiteSpace = "nowrap";
+
+      const select = document.createElement("select");
+      select.dataset.tiktokSortControl = "true";
+      select.dataset.columnIndex = String(config.columnIndex);
+      select.setAttribute(
+        "aria-label",
+        `Sort ${header.textContent?.trim() ?? "column"}`
+      );
+      select.title = "Sort column";
+      select.value = "default";
+
+      const defaultOption = document.createElement("option");
+      defaultOption.value = "default";
+      defaultOption.textContent = "Sort";
+
+      const ascOption = document.createElement("option");
+      ascOption.value = "asc";
+      ascOption.textContent = config.ascLabel;
+
+      const descOption = document.createElement("option");
+      descOption.value = "desc";
+      descOption.textContent = config.descLabel;
+
+      select.append(defaultOption, ascOption, descOption);
+
+      Object.assign(select.style, {
+        marginLeft: "6px",
+        height: "24px",
+        maxWidth: "30px",
+        border: "1px solid #dce1ef",
+        borderRadius: "6px",
+        background: "#fff",
+        color: "#59617a",
+        fontSize: "10px",
+        cursor: "pointer",
+        verticalAlign: "middle",
+        padding: "0 2px"
+      });
+
+      select.addEventListener("change", () => {
+        const direction = select.value as SortDirection;
+
+        if (direction !== "default") {
+          resetOtherControls(config.columnIndex);
+        }
+
+        applySort(config, direction);
+      });
+
+      header.appendChild(select);
+      createdControls.push(select);
+    });
+
     setTablePanel(panel);
     setTableBody(body);
     setMountNode(pagerMount);
-    setTotalRows(body.querySelectorAll("tr").length);
+    setTotalRows(originalRows.length);
     setCurrentPage(1);
 
     return () => {
       body.querySelectorAll<HTMLTableRowElement>("tr").forEach((row) => {
         row.style.display = "";
       });
+
+      originalRows
+        .sort(
+          (a, b) =>
+            Number(a.dataset.originalOrder ?? 0) -
+            Number(b.dataset.originalOrder ?? 0)
+        )
+        .forEach((row) => body.appendChild(row));
+
+      createdControls.forEach((control) => control.remove());
 
       if (pagerMount?.parentNode) {
         pagerMount.parentNode.removeChild(pagerMount);
@@ -98,10 +335,12 @@ export default function TikTokTablePager() {
     const start = (safePage - 1) * PAGE_SIZE;
     const end = start + PAGE_SIZE;
 
-    tableBody.querySelectorAll<HTMLTableRowElement>("tr").forEach((row, index) => {
-      row.style.display = index >= start && index < end ? "" : "none";
-    });
-  }, [tableBody, currentPage, totalPages]);
+    tableBody
+      .querySelectorAll<HTMLTableRowElement>("tr")
+      .forEach((row, index) => {
+        row.style.display = index >= start && index < end ? "" : "none";
+      });
+  }, [tableBody, currentPage, totalPages, sortVersion]);
 
   const visiblePages = useMemo(
     () => buildVisiblePages(currentPage, totalPages),
@@ -125,20 +364,28 @@ export default function TikTokTablePager() {
     }, 20);
   }
 
-  const circleButton = (active = false, disabled = false) => ({
-    width: 42,
-    height: 42,
-    borderRadius: "50%",
-    border: active ? "1px solid #4059d7" : "1px solid #cfd5e5",
-    background: active ? "#4059d7" : disabled ? "#f1f2f6" : "#fff",
-    color: active ? "#fff" : disabled ? "#b1b6c5" : "#141b34",
-    display: "inline-grid",
-    placeItems: "center",
-    fontWeight: 900,
-    fontSize: 14,
-    cursor: disabled ? "not-allowed" : "pointer",
-    boxShadow: active ? "0 8px 18px rgba(64,89,215,.20)" : "none"
-  } as const);
+  const circleButton = (active = false, disabled = false) =>
+    ({
+      width: 42,
+      height: 42,
+      borderRadius: "50%",
+      border: active ? "1px solid #4059d7" : "1px solid #cfd5e5",
+      background: active ? "#4059d7" : disabled ? "#f1f2f6" : "#fff",
+      color: active ? "#fff" : disabled ? "#b1b6c5" : "#141b34",
+      display: "inline-grid",
+      placeItems: "center",
+      fontWeight: 900,
+      fontSize: 14,
+      cursor: disabled ? "not-allowed" : "pointer",
+      boxShadow: active ? "0 8px 18px rgba(64,89,215,.20)" : "none"
+    }) as const;
+
+  const activeSortLabel =
+    activeSort?.direction === "asc"
+      ? "Ascending"
+      : activeSort?.direction === "desc"
+        ? "Descending"
+        : null;
 
   return createPortal(
     <div
@@ -154,9 +401,17 @@ export default function TikTokTablePager() {
       }}
     >
       <div style={{ color: "#8a92a8", fontSize: 10, lineHeight: 1.5 }}>
-        Showing <strong style={{ color: "#59617a" }}>{firstVisible}-{lastVisible}</strong>{" "}
+        Showing{" "}
+        <strong style={{ color: "#59617a" }}>
+          {firstVisible}-{lastVisible}
+        </strong>{" "}
         of <strong style={{ color: "#59617a" }}>{totalRows}</strong> videos
         <span style={{ marginLeft: 8 }}>• 100 videos / page</span>
+        {activeSortLabel ? (
+          <span style={{ marginLeft: 8, color: "#5364d8", fontWeight: 800 }}>
+            • Sorted {activeSortLabel}
+          </span>
+        ) : null}
       </div>
 
       <nav
