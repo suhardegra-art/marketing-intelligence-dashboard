@@ -5,6 +5,7 @@ import TikTokLivePerformanceChart from "@/components/TikTokLivePerformanceChart"
 import TikTokLiveEngagementChart from "@/components/TikTokLiveEngagementChart";
 import TikTokLiveWatchTime from "@/components/TikTokLiveWatchTime";
 import TikTokLiveSessionsTable from "@/components/TikTokLiveSessionsTable";
+import TikTokLiveLeadKpi from "@/components/TikTokLiveLeadKpi";
 
 export const dynamic = "force-dynamic";
 
@@ -41,6 +42,14 @@ export default async function TikTokLivePage() {
   );
 
   const totalLeads = leads.length;
+
+  const qualifiedLeads = leads.filter(
+    (item: any) => item.status === "Qualified"
+  ).length;
+
+  const spkGenerated = leads.filter(
+    (item: any) => item.status === "SPK"
+  ).length;
 
   const totalWatchTime = sessions.reduce(
     (sum: number, item: any) =>
@@ -178,6 +187,12 @@ export default async function TikTokLivePage() {
           data={sessions}
         />
 
+
+        <TikTokLiveLeadKpi
+          total={totalLeads}
+          qualified={qualifiedLeads}
+          spk={spkGenerated}
+        />
 
       </main>
     </div>
