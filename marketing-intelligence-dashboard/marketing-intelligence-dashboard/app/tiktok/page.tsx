@@ -1,6 +1,7 @@
 import Sidebar from "@/components/Sidebar";
 import SyncAllTikTokButton from "@/app/tiktok/SyncAllTikTokButton";
 import { getTikTokDashboardData } from "@/lib/tiktok-dashboard";
+import { getTikTokHistory } from "@/lib/tiktok-history";
 
 export const dynamic = "force-dynamic";
 
@@ -35,7 +36,10 @@ function engagementRate(item: {
 }
 
 export default async function TikTokPage() {
-  const data = await getTikTokDashboardData();
+  const [data, history] = await Promise.all([
+    getTikTokDashboardData(),
+    getTikTokHistory(7)
+  ]);
 
   const topContent = [...data.content]
     .sort((a, b) => b.views - a.views)
@@ -43,6 +47,18 @@ export default async function TikTokPage() {
 
   const avgViews =
     data.loadedVideos > 0 ? Math.round(data.totalViews / data.loadedVideos) : 0;
+
+  const firstHistory = history[0];
+  const latestHistory = history[history.length - 1];
+  const followerGrowth =
+    firstHistory && latestHistory
+      ? latestHistory.followers - firstHistory.followers
+      : 0;
+
+  const maxFollowers = Math.max(...history.map((row) => row.followers), 1);
+  const minFollowers =
+    history.length > 0 ? Math.min(...history.map((row) => row.followers)) : 0;
+  const followerRange = Math.max(maxFollowers - minFollowers, 1);
 
   return (
     <div className="app-shell">
@@ -182,6 +198,81 @@ export default async function TikTokPage() {
           <article className="panel">
             <div className="panel-header">
               <div>
+                <h3>Historical Snapshot</h3>
+                <p>Daily account snapshots saved automatically</p>
+              </div>
+              <div style={{ textAlign: "right" }}>
+                <strong
+                  style={{
+                    color: followerGrowth >= 0 ? "#22a976" : "#e45763",
+                    fontSize: 14
+                  }}
+                >
+                  {followerGrowth >= 0 ? "+" : ""}
+                  {formatNumber(followerGrowth)}
+                </strong>
+                <div style={{ color: "#9aa2b7", fontSize: 9 }}>
+                  follower growth
+                </div>
+              </div>
+            </div>
+
+            {history.length === 0 ? (
+              <p style={{ color: "#8a92a8", fontSize: 11 }}>
+                The first automatic daily snapshot will appear after the cron
+                job runs.
+              </p>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {history.map((row) => {
+                  const width =
+                    25 +
+                    ((row.followers - minFollowers) / followerRange) * 75;
+
+                  return (
+                    <div
+                      key={row.metricDate}
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: "92px 1fr 70px",
+                        gap: 10,
+                        alignItems: "center"
+                      }}
+                    >
+                      <span style={{ color: "#70788e", fontSize: 10 }}>
+                        {formatDate(row.metricDate)}
+                      </span>
+                      <div
+                        style={{
+                          height: 9,
+                          background: "#eef0f6",
+                          borderRadius: 999,
+                          overflow: "hidden"
+                        }}
+                      >
+                        <div
+                          style={{
+                            width: `${width}%`,
+                            height: "100%",
+                            background:
+                              "linear-gradient(90deg,#4059d7,#7259dc)",
+                            borderRadius: 999
+                          }}
+                        />
+                      </div>
+                      <strong style={{ fontSize: 10, textAlign: "right" }}>
+                        {formatNumber(row.followers)}
+                      </strong>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </article>
+
+          <article className="panel">
+            <div className="panel-header">
+              <div>
                 <h3>Content Engagement</h3>
                 <p>Aggregated from the currently loaded public videos</p>
               </div>
@@ -218,59 +309,59 @@ export default async function TikTokPage() {
               })}
             </div>
           </article>
+        </section>
 
-          <article className="panel">
-            <div className="panel-header">
-              <div>
-                <h3>Top Content by Views</h3>
-                <p>Top 5 of the videos currently synced</p>
-              </div>
+        <section className="panel" style={{ marginBottom: 16 }}>
+          <div className="panel-header">
+            <div>
+              <h3>Top Content by Views</h3>
+              <p>Top 5 of the videos currently synced</p>
             </div>
+          </div>
 
-            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              {topContent.map((item, index) => (
-                <div
-                  key={item.id}
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "28px 1fr auto",
-                    gap: 10,
-                    alignItems: "center",
-                    borderBottom: "1px solid #eef0f6",
-                    paddingBottom: 10
-                  }}
-                >
-                  <strong style={{ color: "#69718a" }}>
-                    {String(index + 1).padStart(2, "0")}
-                  </strong>
-                  <div style={{ minWidth: 0 }}>
-                    <div
-                      style={{
-                        fontWeight: 800,
-                        fontSize: 12,
-                        whiteSpace: "nowrap",
-                        overflow: "hidden",
-                        textOverflow: "ellipsis"
-                      }}
-                    >
-                      {item.title}
-                    </div>
-                    <div
-                      style={{
-                        color: "#8a92a8",
-                        fontSize: 10,
-                        marginTop: 3
-                      }}
-                    >
-                      {formatDate(item.publishedAt)} • ER{" "}
-                      {engagementRate(item).toFixed(2)}%
-                    </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            {topContent.map((item, index) => (
+              <div
+                key={item.id}
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "28px 1fr auto",
+                  gap: 10,
+                  alignItems: "center",
+                  borderBottom: "1px solid #eef0f6",
+                  paddingBottom: 10
+                }}
+              >
+                <strong style={{ color: "#69718a" }}>
+                  {String(index + 1).padStart(2, "0")}
+                </strong>
+                <div style={{ minWidth: 0 }}>
+                  <div
+                    style={{
+                      fontWeight: 800,
+                      fontSize: 12,
+                      whiteSpace: "nowrap",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis"
+                    }}
+                  >
+                    {item.title}
                   </div>
-                  <strong>{formatCompact(item.views)}</strong>
+                  <div
+                    style={{
+                      color: "#8a92a8",
+                      fontSize: 10,
+                      marginTop: 3
+                    }}
+                  >
+                    {formatDate(item.publishedAt)} • ER{" "}
+                    {engagementRate(item).toFixed(2)}%
+                  </div>
                 </div>
-              ))}
-            </div>
-          </article>
+                <strong>{formatCompact(item.views)}</strong>
+              </div>
+            ))}
+          </div>
         </section>
 
         <section className="panel table-panel">
@@ -351,14 +442,13 @@ export default async function TikTokPage() {
           }}
         >
           <strong style={{ display: "block", marginBottom: 6 }}>
-            Current API coverage
+            Automatic daily sync
           </strong>
           <p style={{ margin: 0, color: "#7a839d", fontSize: 11, lineHeight: 1.6 }}>
-            Followers, following, total account likes, video count, video views,
-            likes, comment count, shares, dates, captions and video links are
-            available. Standard Display API does not provide account-level
-            Profile Views, Reach or Impressions, so those fields are not
-            fabricated here.
+            Vercel Cron will refresh TikTok account metrics and public video
+            metrics once per day. Daily values are stored as historical
+            snapshots in Supabase. Manual Sync All Videos remains available as
+            a fallback.
           </p>
         </section>
 

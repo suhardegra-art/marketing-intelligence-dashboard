@@ -1,4 +1,5 @@
-import type { TikTokTokenResponse, TikTokVideo } from "@/lib/tiktok";
+import { fetchTikTokUser } from "@/lib/tiktok";
+import type { TikTokTokenResponse, TikTokUser, TikTokVideo } from "@/lib/tiktok";
 
 type StoredConnection = {
   external_account_id: string;
@@ -29,6 +30,25 @@ function getTikTokConfig() {
     throw new Error("TikTok client credentials are not configured.");
   }
   return { clientKey, clientSecret };
+}
+
+function getJakartaDate() {
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Asia/Jakarta",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).formatToParts(new Date());
+
+  const year = parts.find((part) => part.type === "year")?.value;
+  const month = parts.find((part) => part.type === "month")?.value;
+  const day = parts.find((part) => part.type === "day")?.value;
+
+  if (!year || !month || !day) {
+    return new Date().toISOString().slice(0, 10);
+  }
+
+  return `${year}-${month}-${day}`;
 }
 
 async function supabaseFetch(path: string, init: RequestInit = {}) {
@@ -264,6 +284,65 @@ export async function getTikTokAccountId(openId: string) {
   return rows[0].id;
 }
 
+export async function saveTikTokDailyAccountSnapshot(
+  accountId: string,
+  user: TikTokUser
+) {
+  const accountUpdate = await supabaseFetch(
+    `/rest/v1/social_accounts?id=eq.${encodeURIComponent(accountId)}`,
+    {
+      method: "PATCH",
+      headers: {
+        Prefer: "return=minimal"
+      },
+      body: JSON.stringify({
+        account_name: user.display_name || user.username || "TikTok Account",
+        username: user.username ?? null,
+        profile_url: user.profile_deep_link ?? null,
+        is_active: true,
+        updated_at: new Date().toISOString()
+      })
+    }
+  );
+
+  if (!accountUpdate.ok) {
+    throw new Error(
+      `Unable to update TikTok account profile: ${await readError(accountUpdate)}`
+    );
+  }
+
+  const metricDate = getJakartaDate();
+
+  const metricResponse = await supabaseFetch(
+    "/rest/v1/social_account_metrics?on_conflict=account_id,metric_date",
+    {
+      method: "POST",
+      headers: {
+        Prefer: "resolution=merge-duplicates,return=minimal"
+      },
+      body: JSON.stringify({
+        account_id: accountId,
+        metric_date: metricDate,
+        followers: user.follower_count ?? 0,
+        following: user.following_count ?? 0,
+        likes: user.likes_count ?? 0,
+        posts_count: user.video_count ?? 0,
+        extra_metrics: {
+          is_verified: user.is_verified ?? false,
+          bio_description: user.bio_description ?? null,
+          avatar_url: user.avatar_url ?? null
+        }
+      })
+    }
+  );
+
+  if (!metricResponse.ok) {
+    throw new Error(
+      `Unable to save TikTok account snapshot: ${await readError(metricResponse)}`
+    );
+  }
+}
+
 export async function saveTikTokVideoBatch(
   accountId: string,
   videos: TikTokVideo[]
@@ -311,7 +390,7 @@ export async function saveTikTokVideoBatch(
     savedContent.map((item) => [item.external_content_id, item.id])
   );
 
-  const snapshotDate = new Date().toISOString().slice(0, 10);
+  const snapshotDate = getJakartaDate();
 
   const metricRows = videos
     .map((video) => {
@@ -384,7 +463,8 @@ export async function getStoredTikTokVideoCount(accountId: string) {
 
 export async function logTikTokFullSync(
   accountId: string,
-  recordsReceived: number
+  recordsReceived: number,
+  syncType = "tiktok_full_video_sync"
 ) {
   try {
     await supabaseFetch("/rest/v1/social_sync_log", {
@@ -392,13 +472,54 @@ export async function logTikTokFullSync(
       headers: { Prefer: "return=minimal" },
       body: JSON.stringify({
         account_id: accountId,
-        sync_type: "tiktok_full_video_sync",
+        sync_type: syncType,
         finished_at: new Date().toISOString(),
         status: "success",
         records_received: recordsReceived
       })
     });
   } catch (error) {
-    console.error("Unable to write full TikTok sync log", error);
+    console.error("Unable to write TikTok sync log", error);
   }
+}
+
+export async function runTikTokDailySync() {
+  const { accessToken, openId } = await getValidTikTokAccessToken();
+  const accountId = await getTikTokAccountId(openId);
+
+  const user = await fetchTikTokUser(accessToken);
+  await saveTikTokDailyAccountSnapshot(accountId, user);
+
+  let cursor: number | null = null;
+  let totalSynced = 0;
+  let pages = 0;
+
+  while (pages < 100) {
+    const page = await fetchTikTokVideoPage(accessToken, cursor);
+    await saveTikTokVideoBatch(accountId, page.videos);
+
+    totalSynced += page.videos.length;
+    pages += 1;
+
+    if (!page.hasMore) break;
+    if (typeof page.nextCursor !== "number") {
+      throw new Error("TikTok returned has_more without a next cursor.");
+    }
+
+    cursor = page.nextCursor;
+  }
+
+  await logTikTokFullSync(
+    accountId,
+    totalSynced + 1,
+    "tiktok_daily_snapshot_sync"
+  );
+
+  return {
+    accountId,
+    followers: user.follower_count ?? 0,
+    videoCount: user.video_count ?? 0,
+    videosSynced: totalSynced,
+    pages
+  };
 }
