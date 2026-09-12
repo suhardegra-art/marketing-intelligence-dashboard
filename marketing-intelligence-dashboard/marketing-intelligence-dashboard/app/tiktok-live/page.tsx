@@ -1,5 +1,6 @@
 import Sidebar from "@/components/Sidebar";
 import { getTikTokLiveData } from "@/lib/tiktok-live";
+import TikTokLiveKpiCard from "@/components/TikTokLiveKpiCard";
 
 export const dynamic = "force-dynamic";
 
@@ -34,12 +35,36 @@ export default async function TikTokLivePage() {
   const totalLeads = leads.length;
 
   const kpis = [
-    ["Total Views", totalViews],
-    ["Peak Viewers", peakViewers],
-    ["Likes", totalLikes],
-    ["Comments", totalComments],
-    ["Shares", totalShares],
-    ["Total Leads", totalLeads],
+    {
+      title: "Total Views",
+      value: totalViews,
+      icon: "👁"
+    },
+    {
+      title: "Peak Viewers",
+      value: peakViewers,
+      icon: "👥"
+    },
+    {
+      title: "Likes",
+      value: totalLikes,
+      icon: "❤️"
+    },
+    {
+      title: "Comments",
+      value: totalComments,
+      icon: "💬"
+    },
+    {
+      title: "Shares",
+      value: totalShares,
+      icon: "🔗"
+    },
+    {
+      title: "Total Leads",
+      value: totalLeads,
+      icon: "📄"
+    }
   ];
 
   return (
@@ -47,10 +72,13 @@ export default async function TikTokLivePage() {
       <Sidebar activeItem="TikTok Live" />
 
       <main className="main-content">
+
         <header className="topbar">
           <div>
             <h1>TikTok Live Performance</h1>
-            <p>Marketing Performance & Lead Generation Dashboard</p>
+            <p>
+              Marketing Performance & Lead Generation Dashboard
+            </p>
           </div>
         </header>
 
@@ -61,7 +89,7 @@ export default async function TikTokLivePage() {
             marginBottom: 16,
             background:
               "linear-gradient(120deg,#111827 0%,#4f46e5 55%,#7c3aed 100%)",
-            color: "white",
+            color: "white"
           }}
         >
           <h2 style={{ margin: 0 }}>
@@ -73,22 +101,24 @@ export default async function TikTokLivePage() {
           </p>
         </section>
 
+
         <section
           style={{
             display: "grid",
             gridTemplateColumns: "repeat(6,minmax(0,1fr))",
-            gap: 12,
+            gap: 12
           }}
         >
-          {kpis.map(([label, value]) => (
-            <article className="kpi-card" key={label}>
-              <p>{label}</p>
-              <strong>
-                {Number(value).toLocaleString("en-US")}
-              </strong>
-            </article>
+          {kpis.map((item) => (
+            <TikTokLiveKpiCard
+              key={item.title}
+              title={item.title}
+              value={item.value}
+              icon={item.icon}
+            />
           ))}
         </section>
+
 
         <section className="panel" style={{ marginTop: 16 }}>
           <h3>TikTok Live Dashboard</h3>
@@ -101,6 +131,7 @@ export default async function TikTokLivePage() {
             {leads.length} leads collected
           </p>
         </section>
+
       </main>
     </div>
   );
