@@ -59,6 +59,14 @@ async function supabaseGet(path: string) {
   return response.json();
 }
 
+function chunk<T>(items: T[], size: number) {
+  const chunks: T[][] = [];
+  for (let index = 0; index < items.length; index += size) {
+    chunks.push(items.slice(index, index + size));
+  }
+  return chunks;
+}
+
 export async function getTikTokDashboardData(): Promise<TikTokDashboardData> {
   const empty: TikTokDashboardData = {
     connected: false,
@@ -111,7 +119,7 @@ export async function getTikTokDashboardData(): Promise<TikTokDashboardData> {
     const contentRows = (await supabaseGet(
       `/rest/v1/social_content?account_id=eq.${encodeURIComponent(
         account.id
-      )}&select=id,title,caption,published_at,permalink,thumbnail_url,duration_seconds&order=published_at.desc&limit=100`
+      )}&select=id,title,caption,published_at,permalink,thumbnail_url,duration_seconds&order=published_at.desc&limit=1000`
     )) as Array<{
       id: string;
       title: string | null;
@@ -121,6 +129,18 @@ export async function getTikTokDashboardData(): Promise<TikTokDashboardData> {
       thumbnail_url: string | null;
       duration_seconds: number | null;
     }>;
+
+    let latestContentSnapshot: string | null = null;
+
+    if (contentRows.length > 0) {
+      const latest = (await supabaseGet(
+        `/rest/v1/social_content_metrics?content_id=eq.${encodeURIComponent(
+          contentRows[0].id
+        )}&select=snapshot_date&order=snapshot_date.desc&limit=1`
+      )) as Array<{ snapshot_date: string }>;
+
+      latestContentSnapshot = latest[0]?.snapshot_date ?? null;
+    }
 
     let contentMetrics: Array<{
       content_id: string;
@@ -132,24 +152,30 @@ export async function getTikTokDashboardData(): Promise<TikTokDashboardData> {
       interactions: number | null;
     }> = [];
 
-    if (contentRows.length > 0) {
-      const ids = contentRows.map((item) => `"${item.id}"`).join(",");
-      contentMetrics = (await supabaseGet(
-        `/rest/v1/social_content_metrics?content_id=in.(${encodeURIComponent(
-          ids
-        )})&select=content_id,snapshot_date,views,likes,comments,shares,interactions&order=snapshot_date.desc`
-      )) as typeof contentMetrics;
+    if (contentRows.length > 0 && latestContentSnapshot) {
+      for (const idChunk of chunk(contentRows.map((item) => item.id), 40)) {
+        const ids = idChunk.map((id) => `"${id}"`).join(",");
+
+        const rows = (await supabaseGet(
+          `/rest/v1/social_content_metrics?snapshot_date=eq.${encodeURIComponent(
+            latestContentSnapshot
+          )}&content_id=in.(${encodeURIComponent(
+            ids
+          )})&select=content_id,snapshot_date,views,likes,comments,shares,interactions`
+        )) as typeof contentMetrics;
+
+        contentMetrics.push(...rows);
+      }
     }
 
     const latestByContent = new Map<string, (typeof contentMetrics)[number]>();
     for (const metric of contentMetrics) {
-      if (!latestByContent.has(metric.content_id)) {
-        latestByContent.set(metric.content_id, metric);
-      }
+      latestByContent.set(metric.content_id, metric);
     }
 
     const content: TikTokDashboardContent[] = contentRows.map((item) => {
       const metric = latestByContent.get(item.id);
+
       return {
         id: item.id,
         title: item.title || item.caption || "Untitled TikTok video",
@@ -175,9 +201,6 @@ export async function getTikTokDashboardData(): Promise<TikTokDashboardData> {
       0
     );
 
-    const latestContentSnapshot =
-      contentMetrics.length > 0 ? contentMetrics[0].snapshot_date : null;
-
     return {
       connected: true,
       accountName: account.account_name,
@@ -200,6 +223,7 @@ export async function getTikTokDashboardData(): Promise<TikTokDashboardData> {
     };
   } catch (error) {
     console.error("TikTok dashboard data error", error);
+
     return {
       ...empty,
       message:

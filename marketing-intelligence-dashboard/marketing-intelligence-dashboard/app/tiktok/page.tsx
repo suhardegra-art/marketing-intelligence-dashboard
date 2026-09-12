@@ -1,4 +1,5 @@
 import Sidebar from "@/components/Sidebar";
+import SyncAllTikTokButton from "@/app/tiktok/SyncAllTikTokButton";
 import { getTikTokDashboardData } from "@/lib/tiktok-dashboard";
 
 export const dynamic = "force-dynamic";
@@ -145,7 +146,12 @@ export default async function TikTokPage() {
               Connect TikTok
             </a>
           </section>
-        ) : null}
+        ) : (
+          <SyncAllTikTokButton
+            currentLoaded={data.loadedVideos}
+            expectedTotal={data.videoCount}
+          />
+        )}
 
         <section
           style={{
