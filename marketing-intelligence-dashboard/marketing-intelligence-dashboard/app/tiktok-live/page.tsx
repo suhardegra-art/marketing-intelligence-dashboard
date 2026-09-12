@@ -3,6 +3,7 @@ import { getTikTokLiveData } from "@/lib/tiktok-live";
 import TikTokLiveKpiCard from "@/components/TikTokLiveKpiCard";
 import TikTokLivePerformanceChart from "@/components/TikTokLivePerformanceChart";
 import TikTokLiveEngagementChart from "@/components/TikTokLiveEngagementChart";
+import TikTokLiveWatchTime from "@/components/TikTokLiveWatchTime";
 
 export const dynamic = "force-dynamic";
 
@@ -39,6 +40,23 @@ export default async function TikTokLivePage() {
   );
 
   const totalLeads = leads.length;
+
+  const totalWatchTime = sessions.reduce(
+    (sum: number, item: any) =>
+      sum + Number(item.watch_time || 0),
+    0
+  );
+
+  const averageWatchTime =
+    sessions.length > 0
+      ? Math.round(
+          sessions.reduce(
+            (sum: number, item: any) =>
+              sum + Number(item.average_watch_time || 0),
+            0
+          ) / sessions.length
+        )
+      : 0;
 
   const engagementRate =
     totalViews > 0
@@ -146,6 +164,12 @@ export default async function TikTokLivePage() {
           comments={totalComments}
           shares={totalShares}
           engagementRate={engagementRate}
+        />
+
+
+        <TikTokLiveWatchTime
+          totalWatchTime={totalWatchTime}
+          averageWatchTime={averageWatchTime}
         />
 
 
