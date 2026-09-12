@@ -6,6 +6,7 @@ import TikTokLiveEngagementChart from "@/components/TikTokLiveEngagementChart";
 import TikTokLiveWatchTime from "@/components/TikTokLiveWatchTime";
 import TikTokLiveSessionsTable from "@/components/TikTokLiveSessionsTable";
 import TikTokLiveLeadKpi from "@/components/TikTokLiveLeadKpi";
+import TikTokLiveLeadTable from "@/components/TikTokLiveLeadTable";
 
 export const dynamic = "force-dynamic";
 
@@ -192,6 +193,11 @@ export default async function TikTokLivePage() {
           total={totalLeads}
           qualified={qualifiedLeads}
           spk={spkGenerated}
+        />
+
+
+        <TikTokLiveLeadTable
+          data={leads}
         />
 
       </main>
