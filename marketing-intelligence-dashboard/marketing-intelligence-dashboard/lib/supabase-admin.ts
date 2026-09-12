@@ -22,8 +22,10 @@ async function supabaseFetch(path: string, init: RequestInit = {}) {
   if (!config) throw new Error("Supabase environment variables are missing.");
 
   const headers = new Headers(init.headers);
+
+  // New Supabase sb_secret_* API keys must be sent using the apikey header.
+  // They are not JWTs, so do not send them as Authorization: Bearer.
   headers.set("apikey", config.secretKey);
-  headers.set("Authorization", `Bearer ${config.secretKey}`);
 
   if (init.body && !headers.has("Content-Type")) {
     headers.set("Content-Type", "application/json");
@@ -59,6 +61,9 @@ export async function getTikTokConnectionStatus(): Promise<TikTokConnectionStatu
     );
 
     if (!response.ok) {
+      const body = await response.text();
+      console.error("TikTok connection read failed", response.status, body);
+
       return {
         configured: true,
         connected: false,
