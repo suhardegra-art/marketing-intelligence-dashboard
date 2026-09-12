@@ -1,7 +1,9 @@
 import Sidebar from "@/components/Sidebar";
 import SyncAllTikTokButton from "@/app/tiktok/SyncAllTikTokButton";
+import TikTokGrowthComparison from "@/components/TikTokGrowthComparison";
 import { getTikTokDashboardData } from "@/lib/tiktok-dashboard";
 import { getTikTokHistory } from "@/lib/tiktok-history";
+import { getTikTokGrowthData } from "@/lib/tiktok-growth";
 
 export const dynamic = "force-dynamic";
 
@@ -52,12 +54,16 @@ function periodLabel(from: string | null, to: string | null) {
 export default async function TikTokPage({ searchParams }: TikTokPageProps) {
   const params = await searchParams;
 
-  const [data, history] = await Promise.all([
+  const [data, history, growthData] = await Promise.all([
     getTikTokDashboardData({
       from: params.from,
       to: params.to
     }),
     getTikTokHistory({
+      from: params.from,
+      to: params.to
+    }),
+    getTikTokGrowthData({
       from: params.from,
       to: params.to
     })
@@ -284,7 +290,8 @@ export default async function TikTokPage({ searchParams }: TikTokPageProps) {
             }}
           >
             <span style={{ color: "#59617a", fontSize: 10 }}>
-              Selected content period: <strong>{periodLabel(data.fromDate, data.toDate)}</strong>
+              Selected content period:{" "}
+              <strong>{periodLabel(data.fromDate, data.toDate)}</strong>
             </span>
             <span style={{ color: "#9aa2b7", fontSize: 10 }}>
               Filter uses video publish date.
@@ -335,7 +342,10 @@ export default async function TikTokPage({ searchParams }: TikTokPageProps) {
             ["Views in Period", formatCompact(data.totalViews)],
             ["Avg. Views / Video", formatCompact(avgViews)],
             ["Likes in Period", formatCompact(data.totalVideoLikes)],
-            ["Comments + Shares", formatCompact(data.totalComments + data.totalShares)]
+            [
+              "Comments + Shares",
+              formatCompact(data.totalComments + data.totalShares)
+            ]
           ].map(([label, value]) => (
             <article className="kpi-card" key={label}>
               <p>{label}</p>
@@ -344,6 +354,8 @@ export default async function TikTokPage({ searchParams }: TikTokPageProps) {
           ))}
         </section>
 
+        <TikTokGrowthComparison data={growthData} />
+
         <section className="two-column">
           <article className="panel">
             <div className="panel-header">
@@ -351,7 +363,9 @@ export default async function TikTokPage({ searchParams }: TikTokPageProps) {
                 <h3>Historical Snapshot</h3>
                 <p>
                   Account snapshots
-                  {data.fromDate || data.toDate ? " within selected dates" : " from recent daily syncs"}
+                  {data.fromDate || data.toDate
+                    ? " within selected dates"
+                    : " from recent daily syncs"}
                 </p>
               </div>
               <div style={{ textAlign: "right" }}>
@@ -528,7 +542,8 @@ export default async function TikTokPage({ searchParams }: TikTokPageProps) {
             <div>
               <h3>TikTok Content</h3>
               <p>
-                {data.periodVideos} videos in selected period • {data.loadedVideos} total videos stored
+                {data.periodVideos} videos in selected period •{" "}
+                {data.loadedVideos} total videos stored
               </p>
             </div>
           </div>
@@ -603,11 +618,19 @@ export default async function TikTokPage({ searchParams }: TikTokPageProps) {
           <strong style={{ display: "block", marginBottom: 6 }}>
             How the date range works
           </strong>
-          <p style={{ margin: 0, color: "#7a839d", fontSize: 11, lineHeight: 1.6 }}>
+          <p
+            style={{
+              margin: 0,
+              color: "#7a839d",
+              fontSize: 11,
+              lineHeight: 1.6
+            }}
+          >
             The From/To filter selects videos by their TikTok publish date.
-            Views, likes, comments and shares are the latest cumulative values
-            for those selected videos. As daily snapshots accumulate, we can
-            also calculate true performance gained between two dates.
+            Growth Comparison uses daily snapshots: with no date selected it
+            shows the latest available 30-day trend, while a complete From/To
+            selection automatically compares the chosen period with the
+            immediately preceding period of equal length.
           </p>
         </section>
 
