@@ -2,6 +2,7 @@ import Sidebar from "@/components/Sidebar";
 import KpiCard from "@/components/KpiCard";
 import BarChart from "@/components/BarChart";
 import { getSupabaseConnectionStatus } from "@/lib/supabase";
+import { getTikTokConnectionStatus } from "@/lib/supabase-admin";
 
 const onlineData = [
   { label: "Instagram", value: 61, display: "2.7M" },
@@ -28,7 +29,10 @@ const content = [
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
-  const supabaseStatus = await getSupabaseConnectionStatus();
+  const [supabaseStatus, tiktokStatus] = await Promise.all([
+    getSupabaseConnectionStatus(),
+    getTikTokConnectionStatus()
+  ]);
 
   return (
     <div className="app-shell">
@@ -72,6 +76,49 @@ export default async function DashboardPage() {
             <span>Social Accounts</span>
             <strong>{supabaseStatus.accountCount ?? "—"}</strong>
           </div>
+        </section>
+
+        <section
+          style={{
+            background: "#fff",
+            border: "1px solid #e8ebf5",
+            borderRadius: 16,
+            padding: "16px 18px",
+            marginBottom: 16,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 16,
+            flexWrap: "wrap"
+          }}
+        >
+          <div>
+            <strong style={{ display: "block", marginBottom: 4 }}>
+              {tiktokStatus.connected ? "TikTok Connected" : "Connect TikTok"}
+            </strong>
+            <span style={{ color: "#7a839d", fontSize: 13 }}>
+              {tiktokStatus.message}
+            </span>
+          </div>
+
+          <a
+            href="/api/tiktok/connect"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              minHeight: 40,
+              padding: "0 18px",
+              borderRadius: 10,
+              background: tiktokStatus.connected ? "#eef2ff" : "#111827",
+              color: tiktokStatus.connected ? "#4059d7" : "#fff",
+              textDecoration: "none",
+              fontWeight: 800,
+              fontSize: 13
+            }}
+          >
+            {tiktokStatus.connected ? "Reconnect TikTok" : "Connect TikTok"}
+          </a>
         </section>
 
         <section className="kpi-grid">
