@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import TikTokLeadUpload from "@/components/TikTokLeadUpload";
 
 type Lead = {
   lead_date: string;
@@ -67,15 +68,13 @@ export default function TikTokLiveLeadTable({
 
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("All");
-
   const [page, setPage] = useState(1);
 
 
   const filteredData = useMemo(() => {
     return data.filter((lead) => {
 
-      const keyword =
-        search.toLowerCase();
+      const keyword = search.toLowerCase();
 
       const matchSearch =
         !keyword ||
@@ -117,7 +116,7 @@ export default function TikTokLiveLeadTable({
     const blob = new Blob(
       [csv],
       {
-        type: "text/csv;charset=utf-8;"
+        type:"text/csv;charset=utf-8;"
       }
     );
 
@@ -142,7 +141,7 @@ export default function TikTokLiveLeadTable({
     <section
       className="panel"
       style={{
-        marginTop: 16
+        marginTop:16
       }}
     >
 
@@ -159,20 +158,33 @@ export default function TikTokLiveLeadTable({
         </div>
 
 
-        <button
-          onClick={downloadCSV}
+        <div
           style={{
-            padding:"8px 14px",
-            borderRadius:8,
-            border:"none",
-            cursor:"pointer",
-            background:"#4059d7",
-            color:"white",
-            fontWeight:700
+            display:"flex",
+            gap:10,
+            alignItems:"center"
           }}
         >
-          Download CSV
-        </button>
+
+          <TikTokLeadUpload />
+
+
+          <button
+            onClick={downloadCSV}
+            style={{
+              padding:"8px 14px",
+              borderRadius:8,
+              border:"none",
+              cursor:"pointer",
+              background:"#4059d7",
+              color:"white",
+              fontWeight:700
+            }}
+          >
+            Download CSV
+          </button>
+
+        </div>
 
       </div>
 
@@ -245,9 +257,7 @@ export default function TikTokLiveLeadTable({
         >
 
           <thead>
-
             <tr>
-
               {[
                 "Date",
                 "Name",
@@ -269,36 +279,25 @@ export default function TikTokLiveLeadTable({
                   {item}
                 </th>
               ))}
-
             </tr>
-
           </thead>
 
 
           <tbody>
 
             {currentData.map((lead,index)=>(
-
               <tr key={index}>
 
                 <td>{formatDate(lead.lead_date)}</td>
-
                 <td>{lead.name}</td>
-
                 <td>{lead.phone}</td>
-
                 <td>{lead.email}</td>
-
                 <td>{lead.city}</td>
-
                 <td>{lead.interested_model}</td>
-
                 <td>{lead.source}</td>
-
                 <td>{lead.status}</td>
 
               </tr>
-
             ))}
 
           </tbody>
@@ -336,6 +335,7 @@ export default function TikTokLiveLeadTable({
             Previous
           </button>
 
+
           <span
             style={{
               margin:"0 12px"
@@ -343,6 +343,7 @@ export default function TikTokLiveLeadTable({
           >
             {page} / {totalPages}
           </span>
+
 
           <button
             disabled={page===totalPages}
@@ -354,7 +355,6 @@ export default function TikTokLiveLeadTable({
         </div>
 
       </div>
-
 
     </section>
   );
