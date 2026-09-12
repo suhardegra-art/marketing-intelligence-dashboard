@@ -5,6 +5,13 @@ import { getTikTokHistory } from "@/lib/tiktok-history";
 
 export const dynamic = "force-dynamic";
 
+type TikTokPageProps = {
+  searchParams: Promise<{
+    from?: string;
+    to?: string;
+  }>;
+};
+
 function formatNumber(value: number) {
   return new Intl.NumberFormat("en-US").format(value);
 }
@@ -35,10 +42,25 @@ function engagementRate(item: {
   return ((item.likes + item.comments + item.shares) / item.views) * 100;
 }
 
-export default async function TikTokPage() {
+function periodLabel(from: string | null, to: string | null) {
+  if (from && to) return `${formatDate(from)} – ${formatDate(to)}`;
+  if (from) return `From ${formatDate(from)}`;
+  if (to) return `Until ${formatDate(to)}`;
+  return "All publish dates";
+}
+
+export default async function TikTokPage({ searchParams }: TikTokPageProps) {
+  const params = await searchParams;
+
   const [data, history] = await Promise.all([
-    getTikTokDashboardData(),
-    getTikTokHistory(7)
+    getTikTokDashboardData({
+      from: params.from,
+      to: params.to
+    }),
+    getTikTokHistory({
+      from: params.from,
+      to: params.to
+    })
   ]);
 
   const topContent = [...data.content]
@@ -46,7 +68,9 @@ export default async function TikTokPage() {
     .slice(0, 5);
 
   const avgViews =
-    data.loadedVideos > 0 ? Math.round(data.totalViews / data.loadedVideos) : 0;
+    data.periodVideos > 0
+      ? Math.round(data.totalViews / data.periodVideos)
+      : 0;
 
   const firstHistory = history[0];
   const latestHistory = history[history.length - 1];
@@ -108,9 +132,7 @@ export default async function TikTokPage() {
             >
               TIKTOK ACCOUNT
             </p>
-            <h2 style={{ margin: 0, fontSize: 30 }}>
-              {data.accountName}
-            </h2>
+            <h2 style={{ margin: 0, fontSize: 30 }}>{data.accountName}</h2>
             <p
               style={{
                 margin: "8px 0 0",
@@ -140,6 +162,134 @@ export default async function TikTokPage() {
               Open TikTok Profile ↗
             </a>
           ) : null}
+        </section>
+
+        <section
+          className="panel"
+          style={{
+            marginBottom: 16,
+            padding: 16
+          }}
+        >
+          <form
+            action="/tiktok"
+            method="get"
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr auto auto",
+              gap: 12,
+              alignItems: "end"
+            }}
+          >
+            <label style={{ display: "grid", gap: 6 }}>
+              <span
+                style={{
+                  color: "#7a839d",
+                  fontSize: 9,
+                  fontWeight: 800,
+                  textTransform: "uppercase",
+                  letterSpacing: ".08em"
+                }}
+              >
+                From Date
+              </span>
+              <input
+                type="date"
+                name="from"
+                defaultValue={data.fromDate ?? ""}
+                max={data.toDate ?? undefined}
+                style={{
+                  minHeight: 40,
+                  border: "1px solid #dce1ef",
+                  borderRadius: 10,
+                  padding: "0 12px",
+                  background: "#fbfcff",
+                  color: "#141b34"
+                }}
+              />
+            </label>
+
+            <label style={{ display: "grid", gap: 6 }}>
+              <span
+                style={{
+                  color: "#7a839d",
+                  fontSize: 9,
+                  fontWeight: 800,
+                  textTransform: "uppercase",
+                  letterSpacing: ".08em"
+                }}
+              >
+                To Date
+              </span>
+              <input
+                type="date"
+                name="to"
+                defaultValue={data.toDate ?? ""}
+                min={data.fromDate ?? undefined}
+                style={{
+                  minHeight: 40,
+                  border: "1px solid #dce1ef",
+                  borderRadius: 10,
+                  padding: "0 12px",
+                  background: "#fbfcff",
+                  color: "#141b34"
+                }}
+              />
+            </label>
+
+            <button
+              type="submit"
+              style={{
+                minHeight: 40,
+                border: 0,
+                borderRadius: 10,
+                padding: "0 18px",
+                background: "#4059d7",
+                color: "white",
+                fontWeight: 800,
+                fontSize: 12
+              }}
+            >
+              Apply Period
+            </button>
+
+            <a
+              href="/tiktok"
+              style={{
+                minHeight: 40,
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                border: "1px solid #dce1ef",
+                borderRadius: 10,
+                padding: "0 16px",
+                background: "white",
+                color: "#59617a",
+                fontWeight: 800,
+                fontSize: 12,
+                textDecoration: "none"
+              }}
+            >
+              Reset
+            </a>
+          </form>
+
+          <div
+            style={{
+              marginTop: 10,
+              display: "flex",
+              justifyContent: "space-between",
+              gap: 12,
+              flexWrap: "wrap"
+            }}
+          >
+            <span style={{ color: "#59617a", fontSize: 10 }}>
+              Selected content period: <strong>{periodLabel(data.fromDate, data.toDate)}</strong>
+            </span>
+            <span style={{ color: "#9aa2b7", fontSize: 10 }}>
+              Filter uses video publish date.
+            </span>
+          </div>
         </section>
 
         {!data.connected ? (
@@ -178,13 +328,13 @@ export default async function TikTokPage() {
           }}
         >
           {[
-            ["Followers", formatNumber(data.followers)],
-            ["Total Account Likes", formatCompact(data.totalAccountLikes)],
-            ["Total Videos", formatNumber(data.videoCount)],
-            ["Videos Loaded", formatNumber(data.loadedVideos)],
-            ["Views (Loaded Videos)", formatCompact(data.totalViews)],
+            ["Followers (Current)", formatNumber(data.followers)],
+            ["Account Likes (Current)", formatCompact(data.totalAccountLikes)],
+            ["Videos in Period", formatNumber(data.periodVideos)],
+            ["Videos Stored", formatNumber(data.loadedVideos)],
+            ["Views in Period", formatCompact(data.totalViews)],
             ["Avg. Views / Video", formatCompact(avgViews)],
-            ["Likes (Loaded Videos)", formatCompact(data.totalVideoLikes)],
+            ["Likes in Period", formatCompact(data.totalVideoLikes)],
             ["Comments + Shares", formatCompact(data.totalComments + data.totalShares)]
           ].map(([label, value]) => (
             <article className="kpi-card" key={label}>
@@ -199,7 +349,10 @@ export default async function TikTokPage() {
             <div className="panel-header">
               <div>
                 <h3>Historical Snapshot</h3>
-                <p>Daily account snapshots saved automatically</p>
+                <p>
+                  Account snapshots
+                  {data.fromDate || data.toDate ? " within selected dates" : " from recent daily syncs"}
+                </p>
               </div>
               <div style={{ textAlign: "right" }}>
                 <strong
@@ -219,8 +372,8 @@ export default async function TikTokPage() {
 
             {history.length === 0 ? (
               <p style={{ color: "#8a92a8", fontSize: 11 }}>
-                The first automatic daily snapshot will appear after the cron
-                job runs.
+                No account snapshot exists for this date range yet. Historical
+                account data starts from the day automatic snapshots were enabled.
               </p>
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -274,7 +427,7 @@ export default async function TikTokPage() {
             <div className="panel-header">
               <div>
                 <h3>Content Engagement</h3>
-                <p>Aggregated from the currently loaded public videos</p>
+                <p>Videos published in the selected date range</p>
               </div>
             </div>
 
@@ -315,53 +468,59 @@ export default async function TikTokPage() {
           <div className="panel-header">
             <div>
               <h3>Top Content by Views</h3>
-              <p>Top 5 of the videos currently synced</p>
+              <p>Top 5 videos published in the selected period</p>
             </div>
           </div>
 
-          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            {topContent.map((item, index) => (
-              <div
-                key={item.id}
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "28px 1fr auto",
-                  gap: 10,
-                  alignItems: "center",
-                  borderBottom: "1px solid #eef0f6",
-                  paddingBottom: 10
-                }}
-              >
-                <strong style={{ color: "#69718a" }}>
-                  {String(index + 1).padStart(2, "0")}
-                </strong>
-                <div style={{ minWidth: 0 }}>
-                  <div
-                    style={{
-                      fontWeight: 800,
-                      fontSize: 12,
-                      whiteSpace: "nowrap",
-                      overflow: "hidden",
-                      textOverflow: "ellipsis"
-                    }}
-                  >
-                    {item.title}
+          {topContent.length === 0 ? (
+            <p style={{ color: "#8a92a8", fontSize: 11 }}>
+              No TikTok videos were found for this publish-date range.
+            </p>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              {topContent.map((item, index) => (
+                <div
+                  key={item.id}
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "28px 1fr auto",
+                    gap: 10,
+                    alignItems: "center",
+                    borderBottom: "1px solid #eef0f6",
+                    paddingBottom: 10
+                  }}
+                >
+                  <strong style={{ color: "#69718a" }}>
+                    {String(index + 1).padStart(2, "0")}
+                  </strong>
+                  <div style={{ minWidth: 0 }}>
+                    <div
+                      style={{
+                        fontWeight: 800,
+                        fontSize: 12,
+                        whiteSpace: "nowrap",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis"
+                      }}
+                    >
+                      {item.title}
+                    </div>
+                    <div
+                      style={{
+                        color: "#8a92a8",
+                        fontSize: 10,
+                        marginTop: 3
+                      }}
+                    >
+                      {formatDate(item.publishedAt)} • ER{" "}
+                      {engagementRate(item).toFixed(2)}%
+                    </div>
                   </div>
-                  <div
-                    style={{
-                      color: "#8a92a8",
-                      fontSize: 10,
-                      marginTop: 3
-                    }}
-                  >
-                    {formatDate(item.publishedAt)} • ER{" "}
-                    {engagementRate(item).toFixed(2)}%
-                  </div>
+                  <strong>{formatCompact(item.views)}</strong>
                 </div>
-                <strong>{formatCompact(item.views)}</strong>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </section>
 
         <section className="panel table-panel">
@@ -369,7 +528,7 @@ export default async function TikTokPage() {
             <div>
               <h3>TikTok Content</h3>
               <p>
-                Real data synced from TikTok API • {data.loadedVideos} videos currently stored
+                {data.periodVideos} videos in selected period • {data.loadedVideos} total videos stored
               </p>
             </div>
           </div>
@@ -442,13 +601,13 @@ export default async function TikTokPage() {
           }}
         >
           <strong style={{ display: "block", marginBottom: 6 }}>
-            Automatic daily sync
+            How the date range works
           </strong>
           <p style={{ margin: 0, color: "#7a839d", fontSize: 11, lineHeight: 1.6 }}>
-            Vercel Cron will refresh TikTok account metrics and public video
-            metrics once per day. Daily values are stored as historical
-            snapshots in Supabase. Manual Sync All Videos remains available as
-            a fallback.
+            The From/To filter selects videos by their TikTok publish date.
+            Views, likes, comments and shares are the latest cumulative values
+            for those selected videos. As daily snapshots accumulate, we can
+            also calculate true performance gained between two dates.
           </p>
         </section>
 

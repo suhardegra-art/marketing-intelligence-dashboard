@@ -13,6 +13,11 @@ export type TikTokDashboardContent = {
   interactions: number;
 };
 
+export type TikTokDateRange = {
+  from?: string | null;
+  to?: string | null;
+};
+
 export type TikTokDashboardData = {
   connected: boolean;
   accountName: string;
@@ -23,6 +28,7 @@ export type TikTokDashboardData = {
   totalAccountLikes: number;
   videoCount: number;
   loadedVideos: number;
+  periodVideos: number;
   totalViews: number;
   totalVideoLikes: number;
   totalComments: number;
@@ -30,6 +36,8 @@ export type TikTokDashboardData = {
   totalInteractions: number;
   snapshotDate: string | null;
   content: TikTokDashboardContent[];
+  fromDate: string | null;
+  toDate: string | null;
   message: string;
 };
 
@@ -67,7 +75,26 @@ function chunk<T>(items: T[], size: number) {
   return chunks;
 }
 
-export async function getTikTokDashboardData(): Promise<TikTokDashboardData> {
+function normalizeDate(value?: string | null) {
+  if (!value) return null;
+  return /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : null;
+}
+
+function publishedDate(value: string | null) {
+  if (!value) return null;
+  return value.slice(0, 10);
+}
+
+export async function getTikTokDashboardData(
+  range: TikTokDateRange = {}
+): Promise<TikTokDashboardData> {
+  let fromDate = normalizeDate(range.from);
+  let toDate = normalizeDate(range.to);
+
+  if (fromDate && toDate && fromDate > toDate) {
+    [fromDate, toDate] = [toDate, fromDate];
+  }
+
   const empty: TikTokDashboardData = {
     connected: false,
     accountName: "TikTok",
@@ -78,6 +105,7 @@ export async function getTikTokDashboardData(): Promise<TikTokDashboardData> {
     totalAccountLikes: 0,
     videoCount: 0,
     loadedVideos: 0,
+    periodVideos: 0,
     totalViews: 0,
     totalVideoLikes: 0,
     totalComments: 0,
@@ -85,6 +113,8 @@ export async function getTikTokDashboardData(): Promise<TikTokDashboardData> {
     totalInteractions: 0,
     snapshotDate: null,
     content: [],
+    fromDate,
+    toDate,
     message: "TikTok data is not available yet."
   };
 
@@ -116,7 +146,7 @@ export async function getTikTokDashboardData(): Promise<TikTokDashboardData> {
 
     const latestMetric = metrics[0];
 
-    const contentRows = (await supabaseGet(
+    const allContentRows = (await supabaseGet(
       `/rest/v1/social_content?account_id=eq.${encodeURIComponent(
         account.id
       )}&select=id,title,caption,published_at,permalink,thumbnail_url,duration_seconds&order=published_at.desc&limit=1000`
@@ -130,12 +160,22 @@ export async function getTikTokDashboardData(): Promise<TikTokDashboardData> {
       duration_seconds: number | null;
     }>;
 
+    const contentRows = allContentRows.filter((item) => {
+      const date = publishedDate(item.published_at);
+      if (!date) return !fromDate && !toDate;
+      if (fromDate && date < fromDate) return false;
+      if (toDate && date > toDate) return false;
+      return true;
+    });
+
     let latestContentSnapshot: string | null = null;
 
-    if (contentRows.length > 0) {
+    const snapshotSeed = contentRows[0] ?? allContentRows[0];
+
+    if (snapshotSeed) {
       const latest = (await supabaseGet(
         `/rest/v1/social_content_metrics?content_id=eq.${encodeURIComponent(
-          contentRows[0].id
+          snapshotSeed.id
         )}&select=snapshot_date&order=snapshot_date.desc&limit=1`
       )) as Array<{ snapshot_date: string }>;
 
@@ -210,7 +250,8 @@ export async function getTikTokDashboardData(): Promise<TikTokDashboardData> {
       following: latestMetric?.following ?? 0,
       totalAccountLikes: latestMetric?.likes ?? 0,
       videoCount: latestMetric?.posts_count ?? 0,
-      loadedVideos: content.length,
+      loadedVideos: allContentRows.length,
+      periodVideos: content.length,
       totalViews,
       totalVideoLikes,
       totalComments,
@@ -218,6 +259,8 @@ export async function getTikTokDashboardData(): Promise<TikTokDashboardData> {
       totalInteractions,
       snapshotDate: latestMetric?.metric_date ?? latestContentSnapshot,
       content,
+      fromDate,
+      toDate,
       message:
         "Live TikTok profile and public video metrics loaded from Supabase."
     };
