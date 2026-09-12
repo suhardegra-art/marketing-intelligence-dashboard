@@ -5,6 +5,7 @@ import { getTikTokDashboardData } from "@/lib/tiktok-dashboard";
 import { getTikTokHistory } from "@/lib/tiktok-history";
 import { getTikTokGrowthData } from "@/lib/tiktok-growth";
 import TikTokExportButton from "@/components/TikTokExportButton";
+import TikTokSyncMonitoring from "@/components/TikTokSyncMonitoring";
 
 export const dynamic = "force-dynamic";
 
@@ -326,6 +327,8 @@ export default async function TikTokPage({ searchParams }: TikTokPageProps) {
             expectedTotal={data.videoCount}
           />
         )}
+
+<TikTokSyncMonitoring />
 
         <section
           style={{
