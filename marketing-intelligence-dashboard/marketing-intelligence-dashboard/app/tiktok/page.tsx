@@ -4,6 +4,7 @@ import TikTokGrowthComparison from "@/components/TikTokGrowthComparison";
 import { getTikTokDashboardData } from "@/lib/tiktok-dashboard";
 import { getTikTokHistory } from "@/lib/tiktok-history";
 import { getTikTokGrowthData } from "@/lib/tiktok-growth";
+import TikTokExportButton from "@/components/TikTokExportButton";
 
 export const dynamic = "force-dynamic";
 
@@ -546,6 +547,7 @@ export default async function TikTokPage({ searchParams }: TikTokPageProps) {
                 {data.loadedVideos} total videos stored
               </p>
             </div>
+            <TikTokExportButton />
           </div>
 
           <div className="table-wrap">
