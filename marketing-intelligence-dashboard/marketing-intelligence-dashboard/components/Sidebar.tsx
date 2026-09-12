@@ -1,4 +1,5 @@
 import Link from "next/link";
+import TikTokTablePager from "@/components/TikTokTablePager";
 
 const groups = [
   {
@@ -67,6 +68,8 @@ export default function Sidebar({ activeItem = "Dashboard" }: { activeItem?: str
           </div>
         ))}
       </nav>
+
+      <TikTokTablePager />
     </aside>
   );
 }
