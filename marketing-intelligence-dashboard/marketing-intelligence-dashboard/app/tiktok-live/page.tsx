@@ -46,6 +46,12 @@ export default async function TikTokLivePage() {
     0
   );
 
+  const totalNewFollowers = sessions.reduce(
+    (sum: number, item: any) =>
+      sum + Number(item.new_followers || 0),
+    0
+  );
+
   const totalLeads = leads.length;
 
   const qualifiedLeads = leads.filter(
@@ -111,6 +117,11 @@ export default async function TikTokLivePage() {
       icon: "🔗"
     },
     {
+      title: "New Followers",
+      value: totalNewFollowers,
+      icon: "👤"
+    },
+    {
       title: "Total Leads",
       value: totalLeads,
       icon: "📄"
@@ -160,7 +171,7 @@ export default async function TikTokLivePage() {
         <section
           style={{
             display:"grid",
-            gridTemplateColumns:"repeat(6,minmax(0,1fr))",
+            gridTemplateColumns:"repeat(7,minmax(0,1fr))",
             gap:12
           }}
         >
