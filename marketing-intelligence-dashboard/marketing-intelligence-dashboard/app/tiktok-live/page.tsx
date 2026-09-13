@@ -20,16 +20,16 @@ export const dynamic = "force-dynamic";
 export default async function TikTokLivePage({
   searchParams,
 }: {
-  searchParams: {
+  searchParams: Promise<{
     from?: string;
     to?: string;
-  };
+  }>;
 }) {
 
   const {
     from,
     to
-  } = searchParams;
+  } = await searchParams;
 
 
   const {
