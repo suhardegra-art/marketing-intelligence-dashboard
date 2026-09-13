@@ -57,14 +57,12 @@ export default function TikTokLiveDateFilter(){
 
 
     const fromDate =
-      start
-      .toISOString()
+      start.toISOString()
       .slice(0,10);
 
 
     const toDate =
-      today
-      .toISOString()
+      today.toISOString()
       .slice(0,10);
 
 
@@ -95,16 +93,13 @@ export default function TikTokLiveDateFilter(){
 
 
     const fromDate =
-      first
-      .toISOString()
+      first.toISOString()
       .slice(0,10);
 
 
     const toDate =
-      date
-      .toISOString()
+      date.toISOString()
       .slice(0,10);
-
 
 
     setFrom(fromDate);
@@ -142,16 +137,13 @@ export default function TikTokLiveDateFilter(){
 
 
     const fromDate =
-      first
-      .toISOString()
+      first.toISOString()
       .slice(0,10);
 
 
     const toDate =
-      last
-      .toISOString()
+      last.toISOString()
       .slice(0,10);
-
 
 
     setFrom(fromDate);
@@ -164,6 +156,16 @@ export default function TikTokLiveDateFilter(){
 
   }
 
+
+
+  const buttonStyle = {
+    padding:"8px 14px",
+    borderRadius:8,
+    border:"1px solid #d1d5db",
+    background:"white",
+    cursor:"pointer",
+    fontSize:13
+  };
 
 
   return (
@@ -183,90 +185,134 @@ export default function TikTokLiveDateFilter(){
       <div
         style={{
           display:"flex",
-          gap:10,
+          justifyContent:"space-between",
           alignItems:"center",
+          gap:20,
           flexWrap:"wrap"
         }}
       >
 
-        <input
-          type="date"
-          value={from}
-          onChange={(e)=>
-            setFrom(e.target.value)
-          }
+
+        {/* DATE PICKER */}
+
+        <div
           style={{
-            padding:10,
-            borderRadius:8
+            display:"flex",
+            alignItems:"center",
+            gap:10
           }}
-        />
-
-
-        <span>
-          -
-        </span>
-
-
-        <input
-          type="date"
-          value={to}
-          onChange={(e)=>
-            setTo(e.target.value)
-          }
-          style={{
-            padding:10,
-            borderRadius:8
-          }}
-        />
-
-
-        <button
-          onClick={applyFilter}
         >
-          Apply
-        </button>
 
-      </div>
-
-
-
-      <div
-        style={{
-          marginTop:14,
-          display:"flex",
-          gap:8,
-          flexWrap:"wrap"
-        }}
-      >
-
-        <button onClick={()=>quickRange(0)}>
-          Today
-        </button>
+          <input
+            type="date"
+            value={from}
+            onChange={(e)=>
+              setFrom(e.target.value)
+            }
+            style={{
+              padding:"10px 12px",
+              borderRadius:8,
+              border:"1px solid #d1d5db"
+            }}
+          />
 
 
-        <button onClick={()=>quickRange(7)}>
-          Last 7 Days
-        </button>
+          <span>
+            -
+          </span>
 
 
-        <button onClick={()=>quickRange(30)}>
-          Last 30 Days
-        </button>
+          <input
+            type="date"
+            value={to}
+            onChange={(e)=>
+              setTo(e.target.value)
+            }
+            style={{
+              padding:"10px 12px",
+              borderRadius:8,
+              border:"1px solid #d1d5db"
+            }}
+          />
 
 
-        <button onClick={thisMonth}>
-          This Month
-        </button>
+          <button
+            onClick={applyFilter}
+            style={{
+              ...buttonStyle,
+              background:"#4059d7",
+              color:"white",
+              border:"none",
+              fontWeight:600
+            }}
+          >
+            Apply
+          </button>
+
+        </div>
 
 
-        <button onClick={lastMonth}>
-          Last Month
-        </button>
+
+        {/* QUICK RANGE */}
+
+        <div
+          style={{
+            display:"flex",
+            alignItems:"center",
+            gap:8,
+            flexWrap:"wrap"
+          }}
+        >
+
+          <button
+            style={buttonStyle}
+            onClick={()=>quickRange(0)}
+          >
+            Today
+          </button>
 
 
-        <button onClick={()=>quickRange(90)}>
-          Last 90 Days
-        </button>
+          <button
+            style={buttonStyle}
+            onClick={()=>quickRange(7)}
+          >
+            7D
+          </button>
+
+
+          <button
+            style={buttonStyle}
+            onClick={()=>quickRange(30)}
+          >
+            30D
+          </button>
+
+
+          <button
+            style={buttonStyle}
+            onClick={thisMonth}
+          >
+            Month
+          </button>
+
+
+          <button
+            style={buttonStyle}
+            onClick={lastMonth}
+          >
+            Last Month
+          </button>
+
+
+          <button
+            style={buttonStyle}
+            onClick={()=>quickRange(90)}
+          >
+            90D
+          </button>
+
+
+        </div>
 
 
       </div>
