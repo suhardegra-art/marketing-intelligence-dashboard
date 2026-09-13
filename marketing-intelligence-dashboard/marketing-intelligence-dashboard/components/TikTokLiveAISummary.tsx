@@ -3,31 +3,33 @@ type Props = {
   leads: any[];
 };
 
-
 export default function TikTokLiveAISummary({
   sessions,
   leads,
 }: Props) {
 
-
   const bestSession =
-    [...sessions]
-      .sort(
-        (a,b)=>
-          Number(b.views || 0) -
-          Number(a.views || 0)
-      )[0];
+    [...sessions].sort(
+      (a, b) =>
+        Number(b.views || 0) -
+        Number(a.views || 0)
+    )[0];
 
 
-  const productCount =
+  const productCount: Record<string, number> =
     leads.reduce(
-      (acc:any,item:any)=>{
+      (
+        acc: Record<string, number>,
+        item: any
+      ) => {
 
         const model =
           item.interested_model || "Unknown";
 
+
         acc[model] =
           (acc[model] || 0) + 1;
+
 
         return acc;
 
@@ -39,16 +41,16 @@ export default function TikTokLiveAISummary({
   const topProduct =
     Object.entries(productCount)
       .sort(
-        (a:any,b:any)=>b[1]-a[1]
+        ([, a], [, b]) =>
+          Number(b) - Number(a)
       )[0];
 
 
   return (
-
     <section
       className="panel"
       style={{
-        marginTop:16
+        marginTop: 16
       }}
     >
 
@@ -65,55 +67,49 @@ export default function TikTokLiveAISummary({
 
       <div
         style={{
-          marginTop:16,
-          lineHeight:1.8
+          marginTop: 16,
+          lineHeight: 1.8
         }}
       >
 
-        {
-          bestSession && (
-
-            <p>
-              📈 Best Live Performance:
-              {" "}
-              <b>
-                {bestSession.live_date}
-              </b>
-              {" "}
-              generated
-              {" "}
-              <b>
-                {Number(bestSession.views).toLocaleString()}
-              </b>
-              {" "}
-              views.
-            </p>
-
-          )
-        }
+        {bestSession && (
+          <p>
+            📈 Best Live Performance:
+            {" "}
+            <b>
+              {bestSession.live_date}
+            </b>
+            {" "}
+            generated
+            {" "}
+            <b>
+              {Number(
+                bestSession.views || 0
+              ).toLocaleString()}
+            </b>
+            {" "}
+            views.
+          </p>
+        )}
 
 
-        {
-          topProduct && (
-
-            <p>
-              🏆 Highest Product Interest:
-              {" "}
-              <b>
-                {topProduct[0]}
-              </b>
-              {" "}
-              with
-              {" "}
-              <b>
-                {topProduct[1]}
-              </b>
-              {" "}
-              leads.
-            </p>
-
-          )
-        }
+        {topProduct && (
+          <p>
+            🏆 Highest Product Interest:
+            {" "}
+            <b>
+              {topProduct[0]}
+            </b>
+            {" "}
+            with
+            {" "}
+            <b>
+              {Number(topProduct[1])}
+            </b>
+            {" "}
+            leads.
+          </p>
+        )}
 
 
         <p>
@@ -126,9 +122,6 @@ export default function TikTokLiveAISummary({
 
       </div>
 
-
     </section>
-
   );
-
 }

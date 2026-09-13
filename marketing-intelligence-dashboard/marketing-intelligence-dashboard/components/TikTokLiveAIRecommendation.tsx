@@ -1,33 +1,38 @@
 type Props = {
-  sessions:any[];
-  leads:any[];
+  sessions: any[];
+  leads: any[];
 };
 
 
 export default function TikTokLiveAIRecommendation({
   sessions,
   leads,
-}:Props){
+}: Props) {
 
 
   const bestSession =
     [...sessions]
       .sort(
-        (a,b)=>
+        (a, b) =>
           Number(b.views || 0) -
           Number(a.views || 0)
       )[0];
 
 
-  const productCount =
+  const productCount: Record<string, number> =
     leads.reduce(
-      (acc:any,item:any)=>{
+      (
+        acc: Record<string, number>,
+        item: any
+      ) => {
 
         const model =
           item.interested_model || "Unknown";
 
+
         acc[model] =
-          (acc[model] || 0)+1;
+          (acc[model] || 0) + 1;
+
 
         return acc;
 
@@ -39,23 +44,24 @@ export default function TikTokLiveAIRecommendation({
   const topProduct =
     Object.entries(productCount)
       .sort(
-        (a:any,b:any)=>b[1]-a[1]
+        ([, a], [, b]) =>
+          Number(b) - Number(a)
       )[0];
 
 
-  const recommendations = [];
+  const recommendations: string[] = [];
 
 
-  if(bestSession){
+  if (bestSession) {
 
     recommendations.push(
-      `Maintain the successful live format from ${bestSession.live_date} because it generated ${Number(bestSession.views).toLocaleString()} views.`
+      `Maintain the successful live format from ${bestSession.live_date} because it generated ${Number(bestSession.views || 0).toLocaleString()} views.`
     );
 
   }
 
 
-  if(topProduct){
+  if (topProduct) {
 
     recommendations.push(
       `Focus product promotion on ${topProduct[0]} because it has the highest customer interest.`
@@ -64,7 +70,7 @@ export default function TikTokLiveAIRecommendation({
   }
 
 
-  if(leads.length > 0){
+  if (leads.length > 0) {
 
     recommendations.push(
       "Improve CTA placement during live session to increase lead conversion."
@@ -78,7 +84,7 @@ export default function TikTokLiveAIRecommendation({
     <section
       className="panel"
       style={{
-        marginTop:16
+        marginTop: 16
       }}
     >
 
@@ -95,23 +101,20 @@ export default function TikTokLiveAIRecommendation({
 
       <div
         style={{
-          marginTop:16,
-          lineHeight:1.8
+          marginTop: 16,
+          lineHeight: 1.8
         }}
       >
 
-        {
-          recommendations.map(
-            (item,index)=>(
+        {recommendations.map(
+          (item, index) => (
 
-              <p key={index}>
-                💡 {item}
-              </p>
+            <p key={index}>
+              💡 {item}
+            </p>
 
-            )
           )
-        }
-
+        )}
 
       </div>
 
