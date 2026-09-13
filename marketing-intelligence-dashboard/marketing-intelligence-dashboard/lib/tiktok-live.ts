@@ -15,6 +15,9 @@ export async function getTikTokLiveData(
   }
 
 
+  const supabaseKey: string = key;
+
+
 
   let previousFrom = "";
   let previousTo = "";
@@ -102,7 +105,7 @@ export async function getTikTokLiveData(
         `${url}${query}`,
         {
           headers: {
-            apikey: key
+            apikey: supabaseKey
           },
           cache: "no-store"
         }
