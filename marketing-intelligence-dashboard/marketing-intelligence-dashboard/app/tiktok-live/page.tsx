@@ -102,7 +102,7 @@ export default async function TikTokLivePage({
 
   const previousShares =
     previousSessions.reduce(
-      (sum:number,item:any)=
+      (sum:number,item:any)=>
         sum + Number(item.shares || 0),
       0
     );
