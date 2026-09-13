@@ -26,23 +26,31 @@ export default function TikTokLiveDateFilter(){
   const [to,setTo] =
     useState(currentTo);
 
+  const [activeRange,setActiveRange] =
+    useState("");
+
 
 
   function applyFilter(){
 
-    if(!from || !to) return;
+  if(!from || !to) return;
+
+  setActiveRange("");
+
+  router.push(
+    `/tiktok-live?from=${from}&to=${to}`
+  );
+
+}
 
 
-    router.push(
-      `/tiktok-live?from=${from}&to=${to}`
-    );
 
-  }
+function quickRange(
+  days:number,
+  label:string
+){
 
-
-
-  function quickRange(days:number){
-
+    
     const today =
       new Date();
 
