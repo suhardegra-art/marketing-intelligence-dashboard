@@ -26,6 +26,7 @@ export async function getTikTokLiveData(
     const start =
       new Date(from);
 
+
     const end =
       new Date(to);
 
@@ -53,23 +54,23 @@ export async function getTikTokLiveData(
     previousFrom =
       previousStart
         .toISOString()
-        .slice(0,10);
+        .slice(0, 10);
 
 
     previousTo =
       previousEnd
         .toISOString()
-        .slice(0,10);
+        .slice(0, 10);
 
   }
 
 
 
   async function fetchData(
-    table:string,
-    dateField:string,
-    startDate?:string,
-    endDate?:string
+    table: string,
+    dateField: string,
+    startDate?: string,
+    endDate?: string
   ) {
 
 
@@ -78,7 +79,7 @@ export async function getTikTokLiveData(
 
 
 
-    if(startDate){
+    if (startDate) {
 
       query +=
         `&${dateField}=gte.${startDate}`;
@@ -87,7 +88,7 @@ export async function getTikTokLiveData(
 
 
 
-    if(endDate){
+    if (endDate) {
 
       query +=
         `&${dateField}=lte.${endDate}`;
@@ -100,16 +101,16 @@ export async function getTikTokLiveData(
       await fetch(
         `${url}${query}`,
         {
-          headers:{
-          apikey:key || ""
-         }
-          cache:"no-store"
+          headers: {
+            apikey: key
+          },
+          cache: "no-store"
         }
       );
 
 
 
-    if(!response.ok){
+    if (!response.ok) {
 
       throw new Error(
         await response.text()
@@ -131,46 +132,41 @@ export async function getTikTokLiveData(
     previousSessions,
     previousLeads
   ] =
-  await Promise.all([
+    await Promise.all([
 
 
-    // CURRENT PERIOD
-
-    fetchData(
-      "tiktok_live_sessions",
-      "live_date",
-      from,
-      to
-    ),
+      fetchData(
+        "tiktok_live_sessions",
+        "live_date",
+        from,
+        to
+      ),
 
 
-    fetchData(
-      "tiktok_live_leads",
-      "lead_date",
-      from,
-      to
-    ),
+      fetchData(
+        "tiktok_live_leads",
+        "lead_date",
+        from,
+        to
+      ),
 
 
-
-    // PREVIOUS PERIOD
-
-    fetchData(
-      "tiktok_live_sessions",
-      "live_date",
-      previousFrom,
-      previousTo
-    ),
+      fetchData(
+        "tiktok_live_sessions",
+        "live_date",
+        previousFrom,
+        previousTo
+      ),
 
 
-    fetchData(
-      "tiktok_live_leads",
-      "lead_date",
-      previousFrom,
-      previousTo
-    )
+      fetchData(
+        "tiktok_live_leads",
+        "lead_date",
+        previousFrom,
+        previousTo
+      )
 
-  ]);
+    ]);
 
 
 
