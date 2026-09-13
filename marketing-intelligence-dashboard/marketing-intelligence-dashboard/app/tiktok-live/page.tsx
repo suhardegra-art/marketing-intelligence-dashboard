@@ -9,6 +9,7 @@ import TikTokLiveLeadKpi from "@/components/TikTokLiveLeadKpi";
 import TikTokLiveLeadTable from "@/components/TikTokLiveLeadTable";
 import TikTokLiveConversionFunnel from "@/components/TikTokLiveConversionFunnel";
 import TikTokLiveProductInterest from "@/components/TikTokLiveProductInterest";
+import TikTokLiveAISummary from "@/components/TikTokLiveAISummary";
 
 export const dynamic = "force-dynamic";
 
@@ -117,13 +118,17 @@ export default async function TikTokLivePage() {
 
   return (
     <div className="app-shell">
+
       <Sidebar activeItem="TikTok Live" />
 
       <main className="main-content">
 
         <header className="topbar">
           <div>
-            <h1>TikTok Live Performance</h1>
+            <h1>
+              TikTok Live Performance
+            </h1>
+
             <p>
               Marketing Performance & Lead Generation Dashboard
             </p>
@@ -133,19 +138,19 @@ export default async function TikTokLivePage() {
 
         <section
           style={{
-            borderRadius: 18,
-            padding: "30px",
-            marginBottom: 16,
+            borderRadius:18,
+            padding:"30px",
+            marginBottom:16,
             background:
               "linear-gradient(120deg,#111827 0%,#4f46e5 55%,#7c3aed 100%)",
-            color: "white"
+            color:"white"
           }}
         >
-          <h2 style={{ margin: 0 }}>
+          <h2 style={{margin:0}}>
             LIVE BRINGS REAL IMPACT
           </h2>
 
-          <p style={{ marginTop: 8, opacity: 0.8 }}>
+          <p style={{marginTop:8,opacity:0.8}}>
             More Viewers. More Engagement. More Leads.
           </p>
         </section>
@@ -153,12 +158,13 @@ export default async function TikTokLivePage() {
 
         <section
           style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(6,minmax(0,1fr))",
-            gap: 12
+            display:"grid",
+            gridTemplateColumns:"repeat(6,minmax(0,1fr))",
+            gap:12
           }}
         >
-          {kpis.map((item) => (
+
+          {kpis.map((item)=>(
             <TikTokLiveKpiCard
               key={item.title}
               title={item.title}
@@ -166,10 +172,13 @@ export default async function TikTokLivePage() {
               icon={item.icon}
             />
           ))}
+
         </section>
 
 
-        <TikTokLivePerformanceChart data={chartData} />
+        <TikTokLivePerformanceChart
+          data={chartData}
+        />
 
 
         <TikTokLiveEngagementChart
@@ -211,11 +220,18 @@ export default async function TikTokLivePage() {
         />
 
 
+        <TikTokLiveAISummary
+          sessions={sessions}
+          leads={leads}
+        />
+
+
         <TikTokLiveLeadTable
           data={leads}
         />
 
       </main>
+
     </div>
   );
 }
