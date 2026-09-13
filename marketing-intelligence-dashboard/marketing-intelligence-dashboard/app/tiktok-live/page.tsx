@@ -11,132 +11,202 @@ import TikTokLiveConversionFunnel from "@/components/TikTokLiveConversionFunnel"
 import TikTokLiveProductInterest from "@/components/TikTokLiveProductInterest";
 import TikTokLiveAISummary from "@/components/TikTokLiveAISummary";
 import TikTokLiveAIRecommendation from "@/components/TikTokLiveAIRecommendation";
+import TikTokLiveDateFilter from "@/components/TikTokLiveDateFilter";
+
 
 export const dynamic = "force-dynamic";
 
-export default async function TikTokLivePage() {
-  const { sessions, leads } = await getTikTokLiveData();
+
+export default async function TikTokLivePage({
+  searchParams,
+}: {
+  searchParams: {
+    from?: string;
+    to?: string;
+  };
+}) {
+
+  const {
+    from,
+    to
+  } = searchParams;
+
+
+  const {
+    sessions,
+    leads
+  } =
+    await getTikTokLiveData(
+      from,
+      to
+    );
+
 
   const totalViews = sessions.reduce(
-    (sum: number, item: any) => sum + Number(item.views || 0),
+    (sum:number,item:any)=>
+      sum + Number(item.views || 0),
     0
   );
+
 
   const peakViewers =
     sessions.length > 0
       ? Math.max(
-          ...sessions.map((item: any) =>
-            Number(item.peak_viewers || 0)
+          ...sessions.map(
+            (item:any)=>
+              Number(item.peak_viewers || 0)
           )
         )
       : 0;
 
+
   const totalLikes = sessions.reduce(
-    (sum: number, item: any) => sum + Number(item.likes || 0),
+    (sum:number,item:any)=>
+      sum + Number(item.likes || 0),
     0
   );
+
 
   const totalComments = sessions.reduce(
-    (sum: number, item: any) => sum + Number(item.comments || 0),
+    (sum:number,item:any)=>
+      sum + Number(item.comments || 0),
     0
   );
+
 
   const totalShares = sessions.reduce(
-    (sum: number, item: any) => sum + Number(item.shares || 0),
+    (sum:number,item:any)=>
+      sum + Number(item.shares || 0),
     0
   );
 
+
   const totalNewFollowers = sessions.reduce(
-    (sum: number, item: any) =>
+    (sum:number,item:any)=>
       sum + Number(item.new_followers || 0),
     0
   );
 
+
   const totalLeads = leads.length;
 
-  const qualifiedLeads = leads.filter(
-    (item: any) => item.status === "Qualified"
-  ).length;
 
-  const spkGenerated = leads.filter(
-    (item: any) => item.status === "SPK"
-  ).length;
+  const qualifiedLeads =
+    leads.filter(
+      (item:any)=>
+        item.status === "Qualified"
+    ).length;
 
-  const totalWatchTime = sessions.reduce(
-    (sum: number, item: any) =>
-      sum + Number(item.watch_time || 0),
-    0
-  );
+
+  const spkGenerated =
+    leads.filter(
+      (item:any)=>
+        item.status === "SPK"
+    ).length;
+
+
+  const totalWatchTime =
+    sessions.reduce(
+      (sum:number,item:any)=>
+        sum + Number(item.watch_time || 0),
+      0
+    );
+
 
   const averageWatchTime =
     sessions.length > 0
-      ? Math.round(
+      ?
+        Math.round(
           sessions.reduce(
-            (sum: number, item: any) =>
+            (sum:number,item:any)=>
               sum + Number(item.average_watch_time || 0),
             0
-          ) / sessions.length
+          )
+          /
+          sessions.length
         )
-      : 0;
+      :
+        0;
+
 
   const engagementRate =
     totalViews > 0
-      ? ((totalLikes + totalComments + totalShares) / totalViews) * 100
-      : 0;
+      ?
+        (
+          (totalLikes +
+          totalComments +
+          totalShares)
+          /
+          totalViews
+        ) * 100
+      :
+        0;
 
-  const chartData = sessions.map((item: any) => ({
-    live_date: item.live_date,
-    views: Number(item.views || 0),
-    peak_viewers: Number(item.peak_viewers || 0),
-  }));
+
+  const chartData =
+    sessions.map(
+      (item:any)=>({
+        live_date:item.live_date,
+        views:Number(item.views || 0),
+        peak_viewers:Number(item.peak_viewers || 0),
+      })
+    );
+
 
   const kpis = [
     {
-      title: "Total Views",
-      value: totalViews,
-      icon: "👁"
+      title:"Total Views",
+      value:totalViews,
+      icon:"👁"
     },
     {
-      title: "Peak Viewers",
-      value: peakViewers,
-      icon: "👥"
+      title:"Peak Viewers",
+      value:peakViewers,
+      icon:"👥"
     },
     {
-      title: "Likes",
-      value: totalLikes,
-      icon: "❤️"
+      title:"Likes",
+      value:totalLikes,
+      icon:"❤️"
     },
     {
-      title: "Comments",
-      value: totalComments,
-      icon: "💬"
+      title:"Comments",
+      value:totalComments,
+      icon:"💬"
     },
     {
-      title: "Shares",
-      value: totalShares,
-      icon: "🔗"
+      title:"Shares",
+      value:totalShares,
+      icon:"🔗"
     },
     {
-      title: "New Followers",
-      value: totalNewFollowers,
-      icon: "👤"
+      title:"New Followers",
+      value:totalNewFollowers,
+      icon:"👤"
     },
     {
-      title: "Total Leads",
-      value: totalLeads,
-      icon: "📄"
+      title:"Total Leads",
+      value:totalLeads,
+      icon:"📄"
     }
   ];
 
+
   return (
+
     <div className="app-shell">
+
 
       <Sidebar activeItem="TikTok Live" />
 
+
       <main className="main-content">
 
+
         <header className="topbar">
+
           <div>
+
             <h1>
               TikTok Live Performance
             </h1>
@@ -144,8 +214,11 @@ export default async function TikTokLivePage() {
             <p>
               Marketing Performance & Lead Generation Dashboard
             </p>
+
           </div>
+
         </header>
+
 
 
         <section
@@ -158,37 +231,53 @@ export default async function TikTokLivePage() {
             color:"white"
           }}
         >
-          <h2 style={{margin:0}}>
+
+          <h2>
             LIVE BRINGS REAL IMPACT
           </h2>
 
-          <p style={{marginTop:8,opacity:0.8}}>
+          <p>
             More Viewers. More Engagement. More Leads.
           </p>
+
         </section>
+
+
+
+        <TikTokLiveDateFilter />
+
 
 
         <section
           style={{
             display:"grid",
-            gridTemplateColumns:"repeat(7,minmax(0,1fr))",
+            gridTemplateColumns:
+              "repeat(7,minmax(0,1fr))",
             gap:12
           }}
         >
-          {kpis.map((item)=>(
-            <TikTokLiveKpiCard
-              key={item.title}
-              title={item.title}
-              value={item.value}
-              icon={item.icon}
-            />
-          ))}
+
+          {
+            kpis.map(
+              (item)=>(
+                <TikTokLiveKpiCard
+                  key={item.title}
+                  title={item.title}
+                  value={item.value}
+                  icon={item.icon}
+                />
+              )
+            )
+          }
+
         </section>
+
 
 
         <TikTokLivePerformanceChart
           data={chartData}
         />
+
 
 
         <TikTokLiveEngagementChart
@@ -199,10 +288,12 @@ export default async function TikTokLivePage() {
         />
 
 
+
         <TikTokLiveWatchTime
           totalWatchTime={totalWatchTime}
           averageWatchTime={averageWatchTime}
         />
+
 
 
         <TikTokLiveSessionsTable
@@ -210,11 +301,13 @@ export default async function TikTokLivePage() {
         />
 
 
+
         <TikTokLiveLeadKpi
           total={totalLeads}
           qualified={qualifiedLeads}
           spk={spkGenerated}
         />
+
 
 
         <TikTokLiveConversionFunnel
@@ -225,9 +318,11 @@ export default async function TikTokLivePage() {
         />
 
 
+
         <TikTokLiveProductInterest
           leads={leads}
         />
+
 
 
         <TikTokLiveAISummary
@@ -236,18 +331,23 @@ export default async function TikTokLivePage() {
         />
 
 
+
         <TikTokLiveAIRecommendation
           sessions={sessions}
           leads={leads}
         />
 
 
+
         <TikTokLiveLeadTable
           data={leads}
         />
 
+
       </main>
 
+
     </div>
+
   );
 }

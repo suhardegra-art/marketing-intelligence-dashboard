@@ -1,33 +1,93 @@
-export async function getTikTokLiveData() {
-  const url = process.env.SUPABASE_URL?.replace(/\/$/, "");
-  const key = process.env.SUPABASE_SECRET_KEY;
+export async function getTikTokLiveData(
+  from?: string,
+  to?: string
+) {
+
+  const url =
+    process.env.SUPABASE_URL?.replace(/\/$/, "");
+
+  const key =
+    process.env.SUPABASE_SECRET_KEY;
+
 
   if (!url || !key) {
     throw new Error("Supabase missing");
   }
 
-  const sessions = await fetch(
-    `${url}/rest/v1/tiktok_live_sessions?select=*`,
-    {
-      headers: {
-        apikey: key,
-      },
-      cache: "no-store",
-    }
-  );
 
-  const leads = await fetch(
-    `${url}/rest/v1/tiktok_live_leads?select=*`,
-    {
-      headers: {
-        apikey: key,
-      },
-      cache: "no-store",
-    }
-  );
+  let sessionQuery =
+    "/rest/v1/tiktok_live_sessions?select=*";
+
+
+  let leadQuery =
+    "/rest/v1/tiktok_live_leads?select=*";
+
+
+  if (from) {
+    sessionQuery +=
+      `&live_date=gte.${from}`;
+
+    leadQuery +=
+      `&lead_date=gte.${from}`;
+  }
+
+
+  if (to) {
+    sessionQuery +=
+      `&live_date=lte.${to}`;
+
+    leadQuery +=
+      `&lead_date=lte.${to}`;
+  }
+
+
+  const [sessionsRes, leadsRes] =
+    await Promise.all([
+
+      fetch(
+        `${url}${sessionQuery}`,
+        {
+          headers:{
+            apikey:key
+          },
+          cache:"no-store"
+        }
+      ),
+
+
+      fetch(
+        `${url}${leadQuery}`,
+        {
+          headers:{
+            apikey:key
+          },
+          cache:"no-store"
+        }
+      )
+
+    ]);
+
+
+  if(!sessionsRes.ok){
+    throw new Error(
+      await sessionsRes.text()
+    );
+  }
+
+
+  if(!leadsRes.ok){
+    throw new Error(
+      await leadsRes.text()
+    );
+  }
+
 
   return {
-    sessions: await sessions.json(),
-    leads: await leads.json(),
+    sessions:
+      await sessionsRes.json(),
+
+    leads:
+      await leadsRes.json()
   };
+
 }
