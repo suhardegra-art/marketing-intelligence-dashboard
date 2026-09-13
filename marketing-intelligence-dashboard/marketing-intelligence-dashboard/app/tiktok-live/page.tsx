@@ -10,6 +10,7 @@ import TikTokLiveLeadTable from "@/components/TikTokLiveLeadTable";
 import TikTokLiveConversionFunnel from "@/components/TikTokLiveConversionFunnel";
 import TikTokLiveProductInterest from "@/components/TikTokLiveProductInterest";
 import TikTokLiveAISummary from "@/components/TikTokLiveAISummary";
+import TikTokLiveAIRecommendation from "@/components/TikTokLiveAIRecommendation";
 
 export const dynamic = "force-dynamic";
 
@@ -163,7 +164,6 @@ export default async function TikTokLivePage() {
             gap:12
           }}
         >
-
           {kpis.map((item)=>(
             <TikTokLiveKpiCard
               key={item.title}
@@ -172,7 +172,6 @@ export default async function TikTokLivePage() {
               icon={item.icon}
             />
           ))}
-
         </section>
 
 
@@ -221,6 +220,12 @@ export default async function TikTokLivePage() {
 
 
         <TikTokLiveAISummary
+          sessions={sessions}
+          leads={leads}
+        />
+
+
+        <TikTokLiveAIRecommendation
           sessions={sessions}
           leads={leads}
         />
