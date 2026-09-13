@@ -101,8 +101,8 @@ export async function getTikTokLiveData(
         `${url}${query}`,
         {
           headers:{
-            apikey:key
-          },
+          apikey:key || ""
+         }
           cache:"no-store"
         }
       );
