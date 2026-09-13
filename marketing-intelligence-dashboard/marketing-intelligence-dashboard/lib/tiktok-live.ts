@@ -15,7 +15,105 @@ export async function getTikTokLiveData(
   }
 
 
-  const supabaseKey: string = key;
+  const supabaseKey:string = key;
+
+
+
+  async function fetchAll(
+    table:string
+  ) {
+
+    const response =
+      await fetch(
+        `${url}/rest/v1/${table}?select=*`,
+        {
+          headers:{
+            apikey:supabaseKey
+          },
+          cache:"no-store"
+        }
+      );
+
+
+    if(!response.ok){
+
+      throw new Error(
+        await response.text()
+      );
+
+    }
+
+
+    return response.json();
+
+  }
+
+
+
+  const [
+    allSessions,
+    allLeads
+  ] =
+    await Promise.all([
+
+      fetchAll(
+        "tiktok_live_sessions"
+      ),
+
+      fetchAll(
+        "tiktok_live_leads"
+      )
+
+    ]);
+
+
+
+  function filterByDate(
+    data:any[],
+    field:string,
+    start?:string,
+    end?:string
+  ){
+
+    if(!start || !end){
+      return data;
+    }
+
+
+    const startDate =
+      new Date(start);
+
+
+    const endDate =
+      new Date(end);
+
+
+    endDate.setHours(
+      23,
+      59,
+      59,
+      999
+    );
+
+
+    return data.filter(
+      (item:any)=>{
+
+        const itemDate =
+          new Date(
+            item[field]
+          );
+
+
+        return (
+          itemDate >= startDate &&
+          itemDate <= endDate
+        );
+
+      }
+    );
+
+  }
 
 
 
@@ -24,7 +122,7 @@ export async function getTikTokLiveData(
 
 
 
-  if (from && to) {
+  if(from && to){
 
     const start =
       new Date(from);
@@ -32,7 +130,6 @@ export async function getTikTokLiveData(
 
     const end =
       new Date(to);
-
 
 
     const duration =
@@ -43,133 +140,71 @@ export async function getTikTokLiveData(
 
     const previousEnd =
       new Date(
-        start.getTime() - 86400000
+        start.getTime() -
+        86400000
       );
 
 
     const previousStart =
       new Date(
-        previousEnd.getTime() - duration
+        previousEnd.getTime()
+        -
+        duration
       );
 
 
 
     previousFrom =
       previousStart
-        .toISOString()
-        .slice(0, 10);
+      .toISOString()
+      .slice(0,10);
+
 
 
     previousTo =
       previousEnd
-        .toISOString()
-        .slice(0, 10);
+      .toISOString()
+      .slice(0,10);
 
   }
 
 
 
-  async function fetchData(
-    table: string,
-    dateField: string,
-    startDate?: string,
-    endDate?: string
-  ) {
+  const sessions =
+    filterByDate(
+      allSessions,
+      "live_date",
+      from,
+      to
+    );
 
 
-    let query =
-      `/rest/v1/${table}?select=*`;
-
-
-
-    if (startDate) {
-
-      query +=
-        `&${dateField}=gte.${startDate}`;
-
-    }
+  const leads =
+    filterByDate(
+      allLeads,
+      "lead_date",
+      from,
+      to
+    );
 
 
 
-    if (endDate) {
-
-      query +=
-        `&${dateField}=lte.${endDate}`;
-
-    }
-
-
-
-    const response =
-      await fetch(
-        `${url}${query}`,
-        {
-          headers: {
-            apikey: supabaseKey
-          },
-          cache: "no-store"
-        }
-      );
+  const previousSessions =
+    filterByDate(
+      allSessions,
+      "live_date",
+      previousFrom,
+      previousTo
+    );
 
 
-
-    if (!response.ok) {
-
-      throw new Error(
-        await response.text()
-      );
-
-    }
-
-
-
-    return response.json();
-
-  }
-
-
-
-  const [
-    sessions,
-    leads,
-    previousSessions,
-    previousLeads
-  ] =
-    await Promise.all([
-
-
-      fetchData(
-        "tiktok_live_sessions",
-        "live_date",
-        from,
-        to
-      ),
-
-
-      fetchData(
-        "tiktok_live_leads",
-        "lead_date",
-        from,
-        to
-      ),
-
-
-      fetchData(
-        "tiktok_live_sessions",
-        "live_date",
-        previousFrom,
-        previousTo
-      ),
-
-
-      fetchData(
-        "tiktok_live_leads",
-        "lead_date",
-        previousFrom,
-        previousTo
-      )
-
-    ]);
+  const previousLeads =
+    filterByDate(
+      allLeads,
+      "lead_date",
+      previousFrom,
+      previousTo
+    );
 
 
 
