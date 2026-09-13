@@ -26,20 +26,25 @@ export default async function TikTokLivePage({
   }>;
 }) {
 
+
   const {
     from,
     to
   } = await searchParams;
 
 
+
   const {
     sessions,
-    leads
+    leads,
+    previousSessions,
+    previousLeads
   } =
     await getTikTokLiveData(
       from,
       to
     );
+
 
 
   const totalViews = sessions.reduce(
@@ -49,18 +54,21 @@ export default async function TikTokLivePage({
   );
 
 
-  const peakViewers =
-    sessions.length > 0
-      ? Math.max(
-          ...sessions.map(
-            (item:any)=>
-              Number(item.peak_viewers || 0)
-          )
-        )
-      : 0;
+  const previousViews = previousSessions.reduce(
+    (sum:number,item:any)=>
+      sum + Number(item.views || 0),
+    0
+  );
 
 
   const totalLikes = sessions.reduce(
+    (sum:number,item:any)=>
+      sum + Number(item.likes || 0),
+    0
+  );
+
+
+  const previousLikes = previousSessions.reduce(
     (sum:number,item:any)=>
       sum + Number(item.likes || 0),
     0
@@ -74,7 +82,21 @@ export default async function TikTokLivePage({
   );
 
 
+  const previousComments = previousSessions.reduce(
+    (sum:number,item:any)=>
+      sum + Number(item.comments || 0),
+    0
+  );
+
+
   const totalShares = sessions.reduce(
+    (sum:number,item:any)=>
+      sum + Number(item.shares || 0),
+    0
+  );
+
+
+  const previousShares = previousSessions.reduce(
     (sum:number,item:any)=>
       sum + Number(item.shares || 0),
     0
@@ -88,7 +110,19 @@ export default async function TikTokLivePage({
   );
 
 
+  const previousFollowers = previousSessions.reduce(
+    (sum:number,item:any)=>
+      sum + Number(item.new_followers || 0),
+    0
+  );
+
+
   const totalLeads = leads.length;
+
+
+  const previousLeadsCount =
+    previousLeads.length;
+
 
 
   const qualifiedLeads =
@@ -98,11 +132,39 @@ export default async function TikTokLivePage({
     ).length;
 
 
+  const previousQualified =
+    previousLeads.filter(
+      (item:any)=>
+        item.status === "Qualified"
+    ).length;
+
+
+
   const spkGenerated =
     leads.filter(
       (item:any)=>
         item.status === "SPK"
     ).length;
+
+
+  const previousSpk =
+    previousLeads.filter(
+      (item:any)=>
+        item.status === "SPK"
+    ).length;
+
+
+
+  const peakViewers =
+    sessions.length > 0
+      ? Math.max(
+          ...sessions.map(
+            (item:any)=>
+              Number(item.peak_viewers || 0)
+          )
+        )
+      : 0;
+
 
 
   const totalWatchTime =
@@ -113,34 +175,33 @@ export default async function TikTokLivePage({
     );
 
 
+
   const averageWatchTime =
     sessions.length > 0
-      ?
-        Math.round(
+      ? Math.round(
           sessions.reduce(
             (sum:number,item:any)=>
               sum + Number(item.average_watch_time || 0),
             0
-          )
-          /
-          sessions.length
+          ) / sessions.length
         )
-      :
-        0;
+      : 0;
+
 
 
   const engagementRate =
     totalViews > 0
-      ?
-        (
-          (totalLikes +
-          totalComments +
-          totalShares)
+      ? (
+          (
+            totalLikes +
+            totalComments +
+            totalShares
+          )
           /
           totalViews
         ) * 100
-      :
-        0;
+      : 0;
+
 
 
   const chartData =
@@ -153,43 +214,65 @@ export default async function TikTokLivePage({
     );
 
 
+
   const kpis = [
+
     {
       title:"Total Views",
       value:totalViews,
-      icon:"👁"
+      icon:"👁",
+      current:totalViews,
+      previous:previousViews
     },
+
     {
       title:"Peak Viewers",
       value:peakViewers,
       icon:"👥"
     },
+
     {
       title:"Likes",
       value:totalLikes,
-      icon:"❤️"
+      icon:"❤️",
+      current:totalLikes,
+      previous:previousLikes
     },
+
     {
       title:"Comments",
       value:totalComments,
-      icon:"💬"
+      icon:"💬",
+      current:totalComments,
+      previous:previousComments
     },
+
     {
       title:"Shares",
       value:totalShares,
-      icon:"🔗"
+      icon:"🔗",
+      current:totalShares,
+      previous:previousShares
     },
+
     {
       title:"New Followers",
       value:totalNewFollowers,
-      icon:"👤"
+      icon:"👤",
+      current:totalNewFollowers,
+      previous:previousFollowers
     },
+
     {
       title:"Total Leads",
       value:totalLeads,
-      icon:"📄"
+      icon:"📄",
+      current:totalLeads,
+      previous:previousLeadsCount
     }
+
   ];
+
 
 
   return (
@@ -206,7 +289,6 @@ export default async function TikTokLivePage({
         <header className="topbar">
 
           <div>
-
             <h1>
               TikTok Live Performance
             </h1>
@@ -214,7 +296,6 @@ export default async function TikTokLivePage({
             <p>
               Marketing Performance & Lead Generation Dashboard
             </p>
-
           </div>
 
         </header>
@@ -251,8 +332,7 @@ export default async function TikTokLivePage({
         <section
           style={{
             display:"grid",
-            gridTemplateColumns:
-              "repeat(7,minmax(0,1fr))",
+            gridTemplateColumns:"repeat(7,minmax(0,1fr))",
             gap:12
           }}
         >
@@ -265,6 +345,8 @@ export default async function TikTokLivePage({
                   title={item.title}
                   value={item.value}
                   icon={item.icon}
+                  current={item.current}
+                  previous={item.previous}
                 />
               )
             )
@@ -306,6 +388,9 @@ export default async function TikTokLivePage({
           total={totalLeads}
           qualified={qualifiedLeads}
           spk={spkGenerated}
+          previousTotal={previousLeadsCount}
+          previousQualified={previousQualified}
+          previousSpk={previousSpk}
         />
 
 
@@ -315,6 +400,10 @@ export default async function TikTokLivePage({
           leads={totalLeads}
           qualified={qualifiedLeads}
           spk={spkGenerated}
+          previousViews={previousViews}
+          previousLeads={previousLeadsCount}
+          previousQualified={previousQualified}
+          previousSpk={previousSpk}
         />
 
 

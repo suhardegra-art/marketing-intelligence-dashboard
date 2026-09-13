@@ -1,0 +1,59 @@
+type Props = {
+  current:number;
+  previous:number;
+};
+
+
+export default function TikTokLiveComparisonBadge({
+  current,
+  previous,
+}:Props){
+
+  if(previous === 0){
+    return (
+      <small>
+        No previous data
+      </small>
+    );
+  }
+
+
+  const growth =
+    ((current - previous) / previous) * 100;
+
+
+  const positive =
+    growth >= 0;
+
+
+  return (
+
+    <small
+      style={{
+        color:
+          positive
+          ? "#16a34a"
+          : "#dc2626",
+        fontWeight:600
+      }}
+    >
+
+      {positive ? "↑" : "↓"}
+      {" "}
+      {Math.abs(growth).toFixed(1)}%
+
+      {" "}
+      <span
+        style={{
+          color:"#9ca3af",
+          fontWeight:400
+        }}
+      >
+        vs previous period
+      </span>
+
+    </small>
+
+  );
+
+}

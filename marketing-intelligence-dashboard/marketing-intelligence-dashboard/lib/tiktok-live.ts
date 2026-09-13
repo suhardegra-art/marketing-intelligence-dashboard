@@ -15,79 +15,179 @@ export async function getTikTokLiveData(
   }
 
 
-  let sessionQuery =
-    "/rest/v1/tiktok_live_sessions?select=*";
+
+  let previousFrom = "";
+  let previousTo = "";
 
 
-  let leadQuery =
-    "/rest/v1/tiktok_live_leads?select=*";
+
+  if (from && to) {
+
+    const start =
+      new Date(from);
+
+    const end =
+      new Date(to);
 
 
-  if (from) {
-    sessionQuery +=
-      `&live_date=gte.${from}`;
 
-    leadQuery +=
-      `&lead_date=gte.${from}`;
+    const duration =
+      end.getTime() -
+      start.getTime();
+
+
+
+    const previousEnd =
+      new Date(
+        start.getTime() - 86400000
+      );
+
+
+    const previousStart =
+      new Date(
+        previousEnd.getTime() - duration
+      );
+
+
+
+    previousFrom =
+      previousStart
+        .toISOString()
+        .slice(0,10);
+
+
+    previousTo =
+      previousEnd
+        .toISOString()
+        .slice(0,10);
+
   }
 
 
-  if (to) {
-    sessionQuery +=
-      `&live_date=lte.${to}`;
 
-    leadQuery +=
-      `&lead_date=lte.${to}`;
-  }
+  async function fetchData(
+    table:string,
+    dateField:string,
+    startDate?:string,
+    endDate?:string
+  ) {
 
 
-  const [sessionsRes, leadsRes] =
-    await Promise.all([
+    let query =
+      `/rest/v1/${table}?select=*`;
 
-      fetch(
-        `${url}${sessionQuery}`,
+
+
+    if(startDate){
+
+      query +=
+        `&${dateField}=gte.${startDate}`;
+
+    }
+
+
+
+    if(endDate){
+
+      query +=
+        `&${dateField}=lte.${endDate}`;
+
+    }
+
+
+
+    const response =
+      await fetch(
+        `${url}${query}`,
         {
           headers:{
             apikey:key
           },
           cache:"no-store"
         }
-      ),
+      );
 
 
-      fetch(
-        `${url}${leadQuery}`,
-        {
-          headers:{
-            apikey:key
-          },
-          cache:"no-store"
-        }
-      )
 
-    ]);
+    if(!response.ok){
+
+      throw new Error(
+        await response.text()
+      );
+
+    }
 
 
-  if(!sessionsRes.ok){
-    throw new Error(
-      await sessionsRes.text()
-    );
+
+    return response.json();
+
   }
 
 
-  if(!leadsRes.ok){
-    throw new Error(
-      await leadsRes.text()
-    );
-  }
+
+  const [
+    sessions,
+    leads,
+    previousSessions,
+    previousLeads
+  ] =
+  await Promise.all([
+
+
+    // CURRENT PERIOD
+
+    fetchData(
+      "tiktok_live_sessions",
+      "live_date",
+      from,
+      to
+    ),
+
+
+    fetchData(
+      "tiktok_live_leads",
+      "lead_date",
+      from,
+      to
+    ),
+
+
+
+    // PREVIOUS PERIOD
+
+    fetchData(
+      "tiktok_live_sessions",
+      "live_date",
+      previousFrom,
+      previousTo
+    ),
+
+
+    fetchData(
+      "tiktok_live_leads",
+      "lead_date",
+      previousFrom,
+      previousTo
+    )
+
+  ]);
+
 
 
   return {
-    sessions:
-      await sessionsRes.json(),
 
-    leads:
-      await leadsRes.json()
+    sessions,
+
+    leads,
+
+    previousSessions,
+
+    previousLeads,
+
+    previousFrom,
+
+    previousTo
+
   };
 
 }
