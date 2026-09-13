@@ -33,96 +33,103 @@ export default async function TikTokLivePage({
   } = await searchParams;
 
 
-
   const {
     sessions,
     leads,
     previousSessions,
     previousLeads
-  } =
-    await getTikTokLiveData(
-      from,
-      to
+  } = await getTikTokLiveData(
+    from,
+    to
+  );
+
+
+  const totalViews =
+    sessions.reduce(
+      (sum:number,item:any)=>
+        sum + Number(item.views || 0),
+      0
     );
 
 
-
-  const totalViews = sessions.reduce(
-    (sum:number,item:any)=>
-      sum + Number(item.views || 0),
-    0
-  );
-
-
-  const previousViews = previousSessions.reduce(
-    (sum:number,item:any)=>
-      sum + Number(item.views || 0),
-    0
-  );
+  const previousViews =
+    previousSessions.reduce(
+      (sum:number,item:any)=>
+        sum + Number(item.views || 0),
+      0
+    );
 
 
-  const totalLikes = sessions.reduce(
-    (sum:number,item:any)=>
-      sum + Number(item.likes || 0),
-    0
-  );
+  const totalLikes =
+    sessions.reduce(
+      (sum:number,item:any)=>
+        sum + Number(item.likes || 0),
+      0
+    );
 
 
-  const previousLikes = previousSessions.reduce(
-    (sum:number,item:any)=>
-      sum + Number(item.likes || 0),
-    0
-  );
+  const previousLikes =
+    previousSessions.reduce(
+      (sum:number,item:any)=>
+        sum + Number(item.likes || 0),
+      0
+    );
 
 
-  const totalComments = sessions.reduce(
-    (sum:number,item:any)=>
-      sum + Number(item.comments || 0),
-    0
-  );
+  const totalComments =
+    sessions.reduce(
+      (sum:number,item:any)=>
+        sum + Number(item.comments || 0),
+      0
+    );
 
 
-  const previousComments = previousSessions.reduce(
-    (sum:number,item:any)=>
-      sum + Number(item.comments || 0),
-    0
-  );
+  const previousComments =
+    previousSessions.reduce(
+      (sum:number,item:any)=>
+        sum + Number(item.comments || 0),
+      0
+    );
 
 
-  const totalShares = sessions.reduce(
-    (sum:number,item:any)=>
-      sum + Number(item.shares || 0),
-    0
-  );
+  const totalShares =
+    sessions.reduce(
+      (sum:number,item:any)=>
+        sum + Number(item.shares || 0),
+      0
+    );
 
 
-  const previousShares = previousSessions.reduce(
-    (sum:number,item:any)=>
-      sum + Number(item.shares || 0),
-    0
-  );
+  const previousShares =
+    previousSessions.reduce(
+      (sum:number,item:any)=
+        sum + Number(item.shares || 0),
+      0
+    );
 
 
-  const totalNewFollowers = sessions.reduce(
-    (sum:number,item:any)=>
-      sum + Number(item.new_followers || 0),
-    0
-  );
+  const totalNewFollowers =
+    sessions.reduce(
+      (sum:number,item:any)=>
+        sum + Number(item.new_followers || 0),
+      0
+    );
 
 
-  const previousFollowers = previousSessions.reduce(
-    (sum:number,item:any)=>
-      sum + Number(item.new_followers || 0),
-    0
-  );
+  const previousFollowers =
+    previousSessions.reduce(
+      (sum:number,item:any)=>
+        sum + Number(item.new_followers || 0),
+      0
+    );
 
 
-  const totalLeads = leads.length;
+  const totalLeads =
+    leads.length;
 
 
   const previousLeadsCount =
     previousLeads.length;
-
 
 
   const qualifiedLeads =
@@ -139,7 +146,6 @@ export default async function TikTokLivePage({
     ).length;
 
 
-
   const spkGenerated =
     leads.filter(
       (item:any)=>
@@ -154,7 +160,6 @@ export default async function TikTokLivePage({
     ).length;
 
 
-
   const peakViewers =
     sessions.length > 0
       ? Math.max(
@@ -166,14 +171,12 @@ export default async function TikTokLivePage({
       : 0;
 
 
-
   const totalWatchTime =
     sessions.reduce(
       (sum:number,item:any)=>
         sum + Number(item.watch_time || 0),
       0
     );
-
 
 
   const averageWatchTime =
@@ -188,10 +191,10 @@ export default async function TikTokLivePage({
       : 0;
 
 
-
   const engagementRate =
     totalViews > 0
-      ? (
+      ?
+        (
           (
             totalLikes +
             totalComments +
@@ -200,8 +203,8 @@ export default async function TikTokLivePage({
           /
           totalViews
         ) * 100
-      : 0;
-
+      :
+        0;
 
 
   const chartData =
@@ -214,9 +217,7 @@ export default async function TikTokLivePage({
     );
 
 
-
   const kpis = [
-
     {
       title:"Total Views",
       value:totalViews,
@@ -224,13 +225,11 @@ export default async function TikTokLivePage({
       current:totalViews,
       previous:previousViews
     },
-
     {
       title:"Peak Viewers",
       value:peakViewers,
       icon:"👥"
     },
-
     {
       title:"Likes",
       value:totalLikes,
@@ -238,7 +237,6 @@ export default async function TikTokLivePage({
       current:totalLikes,
       previous:previousLikes
     },
-
     {
       title:"Comments",
       value:totalComments,
@@ -246,7 +244,6 @@ export default async function TikTokLivePage({
       current:totalComments,
       previous:previousComments
     },
-
     {
       title:"Shares",
       value:totalShares,
@@ -254,7 +251,6 @@ export default async function TikTokLivePage({
       current:totalShares,
       previous:previousShares
     },
-
     {
       title:"New Followers",
       value:totalNewFollowers,
@@ -262,7 +258,6 @@ export default async function TikTokLivePage({
       current:totalNewFollowers,
       previous:previousFollowers
     },
-
     {
       title:"Total Leads",
       value:totalLeads,
@@ -270,15 +265,12 @@ export default async function TikTokLivePage({
       current:totalLeads,
       previous:previousLeadsCount
     }
-
   ];
-
 
 
   return (
 
     <div className="app-shell">
-
 
       <Sidebar activeItem="TikTok Live" />
 
@@ -299,7 +291,6 @@ export default async function TikTokLivePage({
           </div>
 
         </header>
-
 
 
         <section
@@ -324,9 +315,7 @@ export default async function TikTokLivePage({
         </section>
 
 
-
         <TikTokLiveDateFilter />
-
 
 
         <section
@@ -355,11 +344,9 @@ export default async function TikTokLivePage({
         </section>
 
 
-
         <TikTokLivePerformanceChart
           data={chartData}
         />
-
 
 
         <TikTokLiveEngagementChart
@@ -370,18 +357,15 @@ export default async function TikTokLivePage({
         />
 
 
-
         <TikTokLiveWatchTime
           totalWatchTime={totalWatchTime}
           averageWatchTime={averageWatchTime}
         />
 
 
-
         <TikTokLiveSessionsTable
           data={sessions}
         />
-
 
 
         <TikTokLiveLeadKpi
@@ -392,7 +376,6 @@ export default async function TikTokLivePage({
           previousQualified={previousQualified}
           previousSpk={previousSpk}
         />
-
 
 
         <TikTokLiveConversionFunnel
@@ -407,11 +390,9 @@ export default async function TikTokLivePage({
         />
 
 
-
         <TikTokLiveProductInterest
           leads={leads}
         />
-
 
 
         <TikTokLiveAISummary
@@ -420,12 +401,10 @@ export default async function TikTokLivePage({
         />
 
 
-
         <TikTokLiveAIRecommendation
           sessions={sessions}
           leads={leads}
         />
-
 
 
         <TikTokLiveLeadTable
@@ -434,7 +413,6 @@ export default async function TikTokLivePage({
 
 
       </main>
-
 
     </div>
 
