@@ -1,458 +1,989 @@
-import type {
-  GrowthMetric,
-  GrowthPoint,
-  TikTokGrowthData
-} from "@/lib/tiktok-growth";
+"use client";
 
-function compact(value: number | null) {
-  if (value === null) return "—";
-  return new Intl.NumberFormat("en-US", {
-    notation: "compact",
-    maximumFractionDigits: 1
-  }).format(value);
+import { useMemo } from "react";
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+  CartesianGrid,
+} from "recharts";
+
+
+type DailyMetric = {
+  views: number;
+  likes: number;
+  comments: number;
+  shares: number;
+};
+
+
+type Props = {
+  currentDaily: Record<string, DailyMetric>;
+  previousDaily: Record<string, DailyMetric>;
+
+  currentFollowers: Record<string, number>;
+  previousFollowers: Record<string, number>;
+
+  from: string;
+  to: string;
+
+  previousFrom: string;
+  previousTo: string;
+};
+
+
+function formatNumber(value: number) {
+
+  return new Intl.NumberFormat(
+    "en-US"
+  ).format(value);
+
 }
 
-function signedCompact(value: number | null) {
-  if (value === null) return "—";
-  const prefix = value > 0 ? "+" : "";
-  return `${prefix}${compact(value)}`;
+
+function formatCompact(value: number) {
+
+  if (Math.abs(value) >= 1000000) {
+
+    return (
+      (value / 1000000)
+        .toFixed(1)
+        .replace(".0", "")
+      + "M"
+    );
+
+  }
+
+
+  if (Math.abs(value) >= 1000) {
+
+    return (
+      (value / 1000)
+        .toFixed(1)
+        .replace(".0", "")
+      + "K"
+    );
+
+  }
+
+
+  return formatNumber(value);
+
 }
 
-function formatPercent(value: number | null) {
-  if (value === null || !Number.isFinite(value)) return null;
-  const prefix = value > 0 ? "+" : "";
-  return `${prefix}${value.toFixed(1)}%`;
+
+function formatDate(date: string) {
+
+  if (!date) {
+    return "-";
+  }
+
+
+  const value =
+    new Date(
+      `${date}T00:00:00`
+    );
+
+
+  return value.toLocaleDateString(
+    "en-GB",
+    {
+      day: "2-digit",
+      month: "short",
+    }
+  );
+
 }
 
-function formatDate(value: string) {
-  return new Intl.DateTimeFormat("en-GB", {
-    day: "2-digit",
-    month: "short"
-  }).format(new Date(`${value}T00:00:00Z`));
-}
 
-function buildPath(
-  values: GrowthPoint[],
-  min: number,
-  max: number,
-  width: number,
-  height: number
+function getDates(
+  from: string,
+  to: string
 ) {
-  if (values.length === 0) return "";
 
-  const range = Math.max(max - min, 1);
+  const result: string[] = [];
 
-  return values
-    .map((point, index) => {
-      const x =
-        values.length === 1
-          ? width / 2
-          : (index / (values.length - 1)) * width;
-      const y = height - ((point.value - min) / range) * height;
-      return `${index === 0 ? "M" : "L"}${x.toFixed(2)},${y.toFixed(2)}`;
-    })
-    .join(" ");
+  const start =
+    new Date(
+      `${from}T00:00:00`
+    );
+
+  const end =
+    new Date(
+      `${to}T00:00:00`
+    );
+
+
+  while (
+    start.getTime() <=
+    end.getTime()
+  ) {
+
+    result.push(
+      start
+        .toISOString()
+        .slice(0, 10)
+    );
+
+
+    start.setDate(
+      start.getDate() + 1
+    );
+
+  }
+
+
+  return result;
+
 }
 
-function MiniChart({
+
+function growthRate(
+  current: number,
+  previous: number
+) {
+
+  if (!previous) {
+    return null;
+  }
+
+
+  return (
+    ((current - previous) /
+      previous) *
+    100
+  );
+
+}
+
+
+function GrowthBadge({
   current,
   previous,
-  comparison
 }: {
-  current: GrowthPoint[];
-  previous: GrowthPoint[];
-  comparison: boolean;
+  current: number;
+  previous: number;
 }) {
-  const width = 250;
-  const height = 74;
 
-  const allValues = [
-    ...current.map((point) => point.value),
-    ...(comparison ? previous.map((point) => point.value) : [])
-  ];
+  const growth =
+    growthRate(
+      current,
+      previous
+    );
 
-  if (allValues.length === 0) {
+
+  if (growth === null) {
     return (
-      <div
+      <span
         style={{
-          height,
-          display: "grid",
-          placeItems: "center",
-          color: "#9aa2b7",
-          fontSize: 10
+          fontSize: 11,
+          color: "#9ca3af",
         }}
       >
-        Historical data not available yet
-      </div>
+        No previous data
+      </span>
     );
   }
 
-  const min = Math.min(...allValues);
-  const max = Math.max(...allValues);
-
-  const currentPath = buildPath(current, min, max, width, height);
-  const previousPath = buildPath(previous, min, max, width, height);
-
-  const labels =
-    current.length > 0
-      ? [
-          current[0]?.date,
-          current[Math.floor((current.length - 1) / 2)]?.date,
-          current[current.length - 1]?.date
-        ].filter(Boolean)
-      : [];
 
   return (
-    <div>
-      <svg
-        viewBox={`0 0 ${width} ${height}`}
+    <span
+      style={{
+        fontSize: 11,
+        fontWeight: 700,
+        color:
+          growth >= 0
+            ? "#16a34a"
+            : "#dc2626",
+      }}
+    >
+      {growth >= 0 ? "↑" : "↓"}{" "}
+      {Math.abs(growth).toFixed(1)}%
+    </span>
+  );
+
+}
+
+
+function MetricChart({
+  data,
+  currentKey,
+  previousKey,
+  valueFormat = "number",
+}: {
+  data: any[];
+  currentKey: string;
+  previousKey: string;
+  valueFormat?: "number" | "compact";
+}) {
+
+  return (
+    <div
+      style={{
+        height: 125,
+        marginTop: 12,
+      }}
+    >
+
+      <ResponsiveContainer
         width="100%"
-        height={height}
-        role="img"
-        aria-label="TikTok growth trend"
-        style={{ overflow: "visible" }}
+        height="100%"
       >
-        {[0.25, 0.5, 0.75].map((ratio) => (
-          <line
-            key={ratio}
-            x1="0"
-            x2={width}
-            y1={height * ratio}
-            y2={height * ratio}
-            stroke="#eef0f6"
-            strokeWidth="1"
-          />
-        ))}
 
-        {comparison && previousPath ? (
-          <path
-            d={previousPath}
-            fill="none"
-            stroke="#c8ccef"
-            strokeWidth="2"
-            strokeDasharray="5 4"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        ) : null}
-
-        {currentPath ? (
-          <path
-            d={currentPath}
-            fill="none"
-            stroke="#5867e8"
-            strokeWidth="2.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        ) : null}
-
-        {current.map((point, index) => {
-          if (
-            index !== 0 &&
-            index !== current.length - 1 &&
-            index !== Math.floor((current.length - 1) / 2)
-          ) {
-            return null;
-          }
-
-          const range = Math.max(max - min, 1);
-          const x =
-            current.length === 1
-              ? width / 2
-              : (index / (current.length - 1)) * width;
-          const y = height - ((point.value - min) / range) * height;
-
-          return (
-            <circle
-              key={`${point.date}-${index}`}
-              cx={x}
-              cy={y}
-              r="2.5"
-              fill="#5867e8"
-            />
-          );
-        })}
-      </svg>
-
-      {labels.length > 0 ? (
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            color: "#9aa2b7",
-            fontSize: 8,
-            marginTop: 3
+        <LineChart
+          data={data}
+          margin={{
+            top: 5,
+            right: 4,
+            left: 0,
+            bottom: 0,
           }}
         >
-          {labels.map((label) => (
-            <span key={label}>{formatDate(label)}</span>
-          ))}
-        </div>
-      ) : null}
+
+          <CartesianGrid
+            strokeDasharray="3 3"
+            vertical={false}
+            stroke="#edf0f7"
+          />
+
+          <XAxis
+            dataKey="label"
+            tick={{
+              fontSize: 9,
+              fill: "#8b93a7",
+            }}
+            axisLine={false}
+            tickLine={false}
+            interval="preserveStartEnd"
+          />
+
+          <YAxis
+            hide
+          />
+
+          <Tooltip
+            formatter={(value: any) => {
+
+              const number =
+                Number(value || 0);
+
+              return [
+                valueFormat === "compact"
+                  ? formatCompact(number)
+                  : formatNumber(number),
+                "",
+              ];
+
+            }}
+          />
+
+          <Line
+            type="monotone"
+            dataKey={currentKey}
+            stroke="#5368e8"
+            strokeWidth={2.5}
+            dot={false}
+            activeDot={{
+              r: 4,
+            }}
+          />
+
+          <Line
+            type="monotone"
+            dataKey={previousKey}
+            stroke="#c9cef0"
+            strokeWidth={2}
+            dot={false}
+            activeDot={{
+              r: 3,
+            }}
+          />
+
+        </LineChart>
+
+      </ResponsiveContainer>
+
     </div>
   );
+
 }
 
-function MetricCard({
-  metric,
-  mode
-}: {
-  metric: GrowthMetric;
-  mode: TikTokGrowthData["mode"];
-}) {
-  const comparison = mode === "comparison";
-  const growthPercent = comparison
-    ? formatPercent(metric.comparisonPercent)
-    : formatPercent(metric.periodChangePercent);
-
-  const growthPositive =
-    comparison
-      ? (metric.comparisonPercent ?? 0) >= 0
-      : (metric.periodChangePercent ?? 0) >= 0;
-
-  const primary =
-    metric.key === "followers"
-      ? compact(metric.primaryValue)
-      : signedCompact(metric.primaryValue);
-
-  return (
-    <article
-      style={{
-        minWidth: 190,
-        background: "#fff",
-        border: "1px solid #e8ebf5",
-        borderRadius: 14,
-        padding: "14px 14px 12px",
-        boxShadow: "0 4px 14px rgba(44,55,100,.04)"
-      }}
-    >
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          gap: 10,
-          alignItems: "flex-start",
-          marginBottom: 5
-        }}
-      >
-        <div>
-          <div
-            style={{
-              fontSize: 11,
-              fontWeight: 900,
-              color: "#252d48"
-            }}
-          >
-            {metric.title}
-          </div>
-
-          <div
-            style={{
-              fontSize: 22,
-              lineHeight: 1.15,
-              fontWeight: 900,
-              color: "#141b34",
-              marginTop: 6
-            }}
-          >
-            {primary}
-          </div>
-        </div>
-
-        {growthPercent ? (
-          <div
-            style={{
-              color: growthPositive ? "#17a873" : "#d84d5b",
-              fontWeight: 900,
-              fontSize: 10,
-              whiteSpace: "nowrap"
-            }}
-          >
-            {growthPositive ? "↑" : "↓"} {growthPercent}
-          </div>
-        ) : null}
-      </div>
-
-      <div
-        style={{
-          display: "flex",
-          gap: 12,
-          alignItems: "center",
-          marginBottom: 9,
-          color: "#8c94aa",
-          fontSize: 8
-        }}
-      >
-        <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
-          <span
-            style={{
-              width: 7,
-              height: 7,
-              borderRadius: "50%",
-              background: "#5867e8"
-            }}
-          />
-          {comparison ? "Current" : "Last 30 Days"}
-        </span>
-
-        {comparison ? (
-          <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
-            <span
-              style={{
-                width: 7,
-                height: 7,
-                borderRadius: "50%",
-                background: "#c8ccef"
-              }}
-            />
-            Previous
-          </span>
-        ) : null}
-      </div>
-
-      <MiniChart
-        current={metric.currentSeries}
-        previous={metric.previousSeries}
-        comparison={comparison && metric.previousAvailable}
-      />
-
-      {comparison && !metric.previousAvailable ? (
-        <div
-          style={{
-            marginTop: 7,
-            color: "#9aa2b7",
-            fontSize: 8
-          }}
-        >
-          Previous period data unavailable
-        </div>
-      ) : null}
-    </article>
-  );
-}
 
 export default function TikTokGrowthComparison({
-  data
-}: {
-  data: TikTokGrowthData | null;
-}) {
-  if (!data) {
-    return (
-      <section
-        className="panel"
-        style={{
-          marginBottom: 16,
-          border: "1px solid #dde2f5"
-        }}
-      >
-        <div className="panel-header">
-          <div>
-            <h3>TikTok Growth Comparison</h3>
-            <p>Historical growth data will appear after daily snapshots accumulate.</p>
-          </div>
-        </div>
-      </section>
-    );
-  }
+  currentDaily,
+  previousDaily,
+  currentFollowers,
+  previousFollowers,
+  from,
+  to,
+  previousFrom,
+  previousTo,
+}: Props) {
 
-  const modeLabel =
-    data.mode === "trend"
-      ? `Last 30 Days • ${formatDate(data.currentFrom)} – ${formatDate(
-          data.currentTo
-        )}`
-      : `${formatDate(data.currentFrom)} – ${formatDate(
-          data.currentTo
-        )} vs ${formatDate(data.previousFrom!)} – ${formatDate(
-          data.previousTo!
-        )}`;
+
+  const dates =
+    useMemo(
+      () =>
+        getDates(
+          from,
+          to
+        ),
+      [from, to]
+    );
+
+
+  const previousDates =
+    useMemo(
+      () =>
+        getDates(
+          previousFrom,
+          previousTo
+        ),
+      [
+        previousFrom,
+        previousTo,
+      ]
+    );
+
+
+  const chartData =
+    useMemo(() => {
+
+      return dates.map(
+        (
+          date,
+          index
+        ) => {
+
+          const previousDate =
+            previousDates[index];
+
+
+          const current =
+            currentDaily[date] || {
+              views: 0,
+              likes: 0,
+              comments: 0,
+              shares: 0,
+            };
+
+
+          const previous =
+            previousDaily[
+              previousDate
+            ] || {
+              views: 0,
+              likes: 0,
+              comments: 0,
+              shares: 0,
+            };
+
+
+          return {
+
+            label:
+              formatDate(date),
+
+            currentViews:
+              current.views,
+
+            previousViews:
+              previous.views,
+
+            currentLikes:
+              current.likes,
+
+            previousLikes:
+              previous.likes,
+
+            currentCommentsShares:
+              current.comments +
+              current.shares,
+
+            previousCommentsShares:
+              previous.comments +
+              previous.shares,
+
+            currentFollowers:
+              currentFollowers[date] || 0,
+
+            previousFollowers:
+              previousFollowers[
+                previousDate
+              ] || 0,
+
+          };
+
+        }
+      );
+
+    }, [
+      dates,
+      previousDates,
+      currentDaily,
+      previousDaily,
+      currentFollowers,
+      previousFollowers,
+    ]);
+
+
+
+
+  const totalViews =
+    dates.reduce(
+      (
+        sum,
+        date
+      ) =>
+        sum +
+        Number(
+          currentDaily[date]
+            ?.views || 0
+        ),
+      0
+    );
+
+
+  const previousTotalViews =
+    previousDates.reduce(
+      (
+        sum,
+        date
+      ) =>
+        sum +
+        Number(
+          previousDaily[date]
+            ?.views || 0
+        ),
+      0
+    );
+
+
+
+  const totalLikes =
+    dates.reduce(
+      (
+        sum,
+        date
+      ) =>
+        sum +
+        Number(
+          currentDaily[date]
+            ?.likes || 0
+        ),
+      0
+    );
+
+
+  const previousTotalLikes =
+    previousDates.reduce(
+      (
+        sum,
+        date
+      ) =>
+        sum +
+        Number(
+          previousDaily[date]
+            ?.likes || 0
+        ),
+      0
+    );
+
+
+
+  const totalCommentsShares =
+    dates.reduce(
+      (
+        sum,
+        date
+      ) => {
+
+        const row =
+          currentDaily[date];
+
+        return (
+          sum +
+          Number(
+            row?.comments || 0
+          ) +
+          Number(
+            row?.shares || 0
+          )
+        );
+
+      },
+      0
+    );
+
+
+  const previousCommentsShares =
+    previousDates.reduce(
+      (
+        sum,
+        date
+      ) => {
+
+        const row =
+          previousDaily[date];
+
+        return (
+          sum +
+          Number(
+            row?.comments || 0
+          ) +
+          Number(
+            row?.shares || 0
+          )
+        );
+
+      },
+      0
+    );
+
+
+
+  const firstFollower =
+    dates.length > 0
+      ? Number(
+          currentFollowers[
+            dates[0]
+          ] || 0
+        )
+      : 0;
+
+
+  const lastFollower =
+    dates.length > 0
+      ? Number(
+          currentFollowers[
+            dates[
+              dates.length - 1
+            ]
+          ] || 0
+        )
+      : 0;
+
+
+  const previousFirstFollower =
+    previousDates.length > 0
+      ? Number(
+          previousFollowers[
+            previousDates[0]
+          ] || 0
+        )
+      : 0;
+
+
+  const previousLastFollower =
+    previousDates.length > 0
+      ? Number(
+          previousFollowers[
+            previousDates[
+              previousDates.length - 1
+            ]
+          ] || 0
+        )
+      : 0;
+
+
+
+  const newFollowers =
+    Math.max(
+      0,
+      lastFollower -
+      firstFollower
+    );
+
+
+  const previousNewFollowers =
+    Math.max(
+      0,
+      previousLastFollower -
+      previousFirstFollower
+    );
+
+
+
+  const followerGrowth =
+    firstFollower > 0
+      ? (
+          (
+            lastFollower -
+            firstFollower
+          )
+          /
+          firstFollower
+        ) * 100
+      : 0;
+
+
+  const previousFollowerGrowth =
+    previousFirstFollower > 0
+      ? (
+          (
+            previousLastFollower -
+            previousFirstFollower
+          )
+          /
+          previousFirstFollower
+        ) * 100
+      : 0;
+
+
+
+  const cards = [
+
+    {
+      title:
+        "Follower Growth",
+
+      value:
+        followerGrowth,
+
+      previous:
+        previousFollowerGrowth,
+
+      type:
+        "percentage",
+
+      currentLabel:
+        `${formatCompact(lastFollower)} followers`,
+
+      previousLabel:
+        `${formatCompact(previousLastFollower)} followers`,
+
+      dataKey:
+        "currentFollowers",
+
+      previousKey:
+        "previousFollowers",
+
+    },
+
+    {
+      title:
+        "Views",
+
+      value:
+        totalViews,
+
+      previous:
+        previousTotalViews,
+
+      type:
+        "number",
+
+      dataKey:
+        "currentViews",
+
+      previousKey:
+        "previousViews",
+
+    },
+
+    {
+      title:
+        "Likes",
+
+      value:
+        totalLikes,
+
+      previous:
+        previousTotalLikes,
+
+      type:
+        "number",
+
+      dataKey:
+        "currentLikes",
+
+      previousKey:
+        "previousLikes",
+
+    },
+
+    {
+      title:
+        "Comments & Shares",
+
+      value:
+        totalCommentsShares,
+
+      previous:
+        previousCommentsShares,
+
+      type:
+        "number",
+
+      dataKey:
+        "currentCommentsShares",
+
+      previousKey:
+        "previousCommentsShares",
+
+    },
+
+    {
+      title:
+        "New Followers",
+
+      value:
+        newFollowers,
+
+      previous:
+        previousNewFollowers,
+
+      type:
+        "number",
+
+      dataKey:
+        "currentFollowers",
+
+      previousKey:
+        "previousFollowers",
+
+    },
+
+  ];
+
+
 
   return (
+
     <section
+      className="panel"
       style={{
-        background: "#f9faff",
-        border: "1px solid #dce2ff",
-        borderRadius: 16,
+        marginTop: 16,
         padding: 16,
-        marginBottom: 16,
-        boxShadow: "0 6px 18px rgba(72,84,165,.05)"
       }}
     >
+
       <div
         style={{
           display: "flex",
-          justifyContent: "space-between",
-          gap: 16,
-          alignItems: "flex-start",
-          marginBottom: 14
+          justifyContent:
+            "space-between",
+          alignItems:
+            "center",
+          marginBottom: 16,
+          gap: 12,
         }}
       >
+
         <div>
+
           <h3
             style={{
               margin: 0,
-              fontSize: 16,
-              color: "#141b34"
+              fontSize: 18,
             }}
           >
             TikTok Growth Comparison
           </h3>
+
           <p
             style={{
-              margin: "4px 0 0",
-              color: "#838ca5",
-              fontSize: 10
+              margin:
+                "4px 0 0",
+              color:
+                "#8b93a7",
+              fontSize: 12,
             }}
           >
-            {data.mode === "trend"
-              ? "Default trend view for the latest available 30 days."
-              : "Selected date range compared automatically with the previous period of equal length."}
+            Selected date range compared automatically with the previous period of equal length.
           </p>
+
         </div>
+
 
         <div
           style={{
-            background: "#fff",
-            border: "1px solid #e2e6f4",
+            fontSize: 11,
+            fontWeight: 700,
+            color: "#667085",
+            background: "#f7f8fc",
+            border:
+              "1px solid #e5e7ef",
             borderRadius: 10,
-            padding: "8px 10px",
-            color: "#5f6881",
-            fontSize: 9,
-            fontWeight: 800,
-            whiteSpace: "nowrap"
+            padding:
+              "8px 12px",
+            whiteSpace:
+              "nowrap",
           }}
         >
-          {modeLabel}
+          {formatDate(from)}
+          {" – "}
+          {formatDate(to)}
+          {" vs "}
+          {formatDate(previousFrom)}
+          {" – "}
+          {formatDate(previousTo)}
         </div>
+
       </div>
+
+
 
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(5,minmax(190px,1fr))",
-          gap: 10,
-          overflowX: "auto",
-          paddingBottom: 2
+          gridTemplateColumns:
+            "repeat(5,minmax(0,1fr))",
+          gap: 12,
         }}
       >
-        {data.metrics.map((metric) => (
-          <MetricCard key={metric.key} metric={metric} mode={data.mode} />
-        ))}
+
+        {cards.map(
+          (card) => (
+
+            <div
+              key={card.title}
+              style={{
+                background: "#fff",
+                border:
+                  "1px solid #edf0f7",
+                borderRadius: 14,
+                padding: 14,
+                minWidth: 0,
+              }}
+            >
+
+              <div
+                style={{
+                  fontSize: 12,
+                  fontWeight: 700,
+                  color: "#344054",
+                }}
+              >
+                {card.title}
+              </div>
+
+
+              <div
+                style={{
+                  marginTop: 8,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                }}
+              >
+
+                <strong
+                  style={{
+                    fontSize: 24,
+                    color: "#17213d",
+                  }}
+                >
+
+                  {
+                    card.type ===
+                    "percentage"
+
+                      ? `${card.value >= 0 ? "+" : ""}${card.value.toFixed(1)}%`
+
+                      : `+${formatCompact(
+                          card.value
+                        )}`
+
+                  }
+
+                </strong>
+
+
+                <GrowthBadge
+                  current={
+                    card.value
+                  }
+                  previous={
+                    card.previous
+                  }
+                />
+
+              </div>
+
+
+              <div
+                style={{
+                  display: "flex",
+                  gap: 10,
+                  marginTop: 6,
+                  fontSize: 10,
+                  color: "#8b93a7",
+                }}
+              >
+
+                <span>
+                  <span
+                    style={{
+                      display:
+                        "inline-block",
+                      width: 7,
+                      height: 7,
+                      borderRadius:
+                        "50%",
+                      background:
+                        "#5368e8",
+                      marginRight: 4,
+                    }}
+                  />
+
+                  Current
+
+                </span>
+
+
+                <span>
+                  <span
+                    style={{
+                      display:
+                        "inline-block",
+                      width: 7,
+                      height: 7,
+                      borderRadius:
+                        "50%",
+                      background:
+                        "#c9cef0",
+                      marginRight: 4,
+                    }}
+                  />
+
+                  Previous
+
+                </span>
+
+              </div>
+
+
+              <MetricChart
+                data={chartData}
+                currentKey={
+                  card.dataKey
+                }
+                previousKey={
+                  card.previousKey
+                }
+                valueFormat={
+                  card.type ===
+                  "percentage"
+                    ? "number"
+                    : "compact"
+                }
+              />
+
+
+            </div>
+
+          )
+        )}
+
       </div>
 
-      {data.snapshotCount < 2 ? (
-        <p
-          style={{
-            margin: "10px 0 0",
-            color: "#9aa2b7",
-            fontSize: 9
-          }}
-        >
-          Only {data.snapshotCount} daily snapshot is available so far. The
-          charts will become more meaningful automatically as daily history
-          accumulates.
-        </p>
-      ) : null}
+
     </section>
+
   );
+
 }
