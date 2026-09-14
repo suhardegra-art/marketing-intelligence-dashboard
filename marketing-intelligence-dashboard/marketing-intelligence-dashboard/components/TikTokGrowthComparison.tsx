@@ -19,7 +19,7 @@ type Props = {
   data: TikTokGrowthData | null;
 };
 
-type RangeDays = 7 | 30 | 60 | 90;
+type RangeDays = 7 | 30 | 90 | 180 | 365;
 
 type Card = {
   key: string;
@@ -33,7 +33,16 @@ type Card = {
   }>;
 };
 
-const RANGE_OPTIONS: RangeDays[] = [7, 30, 60, 90];
+const RANGE_OPTIONS: Array<{
+  days: RangeDays;
+  label: string;
+}> = [
+  { days: 7, label: "7D" },
+  { days: 30, label: "1M" },
+  { days: 90, label: "3M" },
+  { days: 180, label: "6M" },
+  { days: 365, label: "1Y" }
+];
 
 function formatNumber(value: number) {
   return new Intl.NumberFormat("en-US").format(
@@ -223,7 +232,7 @@ export default function TikTokGrowthComparison({
   data
 }: Props) {
   const [rangeDays, setRangeDays] =
-    useState<RangeDays>(30);
+    useState<RangeDays>(7);
 
   const cards = useMemo<Card[]>(() => {
     if (!data) return [];
@@ -382,14 +391,17 @@ export default function TikTokGrowthComparison({
             borderRadius: 10
           }}
         >
-          {RANGE_OPTIONS.map((days) => {
-            const active = rangeDays === days;
+          {RANGE_OPTIONS.map((option) => {
+            const active =
+              rangeDays === option.days;
 
             return (
               <button
-                key={days}
+                key={option.days}
                 type="button"
-                onClick={() => setRangeDays(days)}
+                onClick={() =>
+                  setRangeDays(option.days)
+                }
                 style={{
                   border: active
                     ? "1px solid #5368e8"
@@ -410,7 +422,7 @@ export default function TikTokGrowthComparison({
                     : "none"
                 }}
               >
-                {days}D
+                {option.label}
               </button>
             );
           })}

@@ -94,7 +94,7 @@ export default async function TikTokPage({
     new Date(`${growthTo}T00:00:00Z`);
 
   growthStart.setUTCDate(
-    growthStart.getUTCDate() - 89
+    growthStart.getUTCDate() - 364
   );
 
   const growthFrom =
