@@ -6,6 +6,10 @@ import {
   useState
 } from "react";
 
+import type {
+  TikTokContentRangeDays
+} from "@/components/TikTokContentPerformanceTrend";
+
 type ContentItem = {
   id: string;
   title: string;
@@ -53,27 +57,19 @@ type Props = {
   accountLikes: number;
   content: ContentItem[];
   growthData: GrowthData;
+  rangeDays: TikTokContentRangeDays;
 };
 
-type RangeDays = 7 | 30 | 90;
-
-const RANGE_OPTIONS: Array<{
-  days: RangeDays;
-  label: string;
-}> = [
-  {
-    days: 7,
-    label: "7D"
-  },
-  {
-    days: 30,
-    label: "1M"
-  },
-  {
-    days: 90,
-    label: "3M"
-  }
-];
+const RANGE_LABELS: Record<
+  TikTokContentRangeDays,
+  string
+> = {
+  7: "7D",
+  30: "1M",
+  90: "3M",
+  180: "6M",
+  365: "1Y"
+};
 
 function toDateKey(
   value: string | null
@@ -205,11 +201,9 @@ export default function TikTokAIAnalysis({
   followers,
   accountLikes,
   content,
-  growthData
+  growthData,
+  rangeDays
 }: Props) {
-  const [rangeDays, setRangeDays] =
-    useState<RangeDays>(7);
-
   const [result, setResult] =
     useState<StoredAnalysis | null>(
       null
@@ -272,10 +266,7 @@ export default function TikTokAIAnalysis({
     );
 
   const periodLabel =
-    RANGE_OPTIONS.find(
-      (item) =>
-        item.days === rangeDays
-    )?.label || "7D";
+    RANGE_LABELS[rangeDays];
 
   const storageKey =
     useMemo(
@@ -729,71 +720,15 @@ export default function TikTokAIAnalysis({
             flexWrap: "wrap"
           }}
         >
-          <div
+          <span
             style={{
-              display: "flex",
-              gap: 4,
-              padding: 4,
-              borderRadius: 10,
-              border:
-                "1px solid #e5e7ef",
-              background:
-                "#f7f8fc"
+              color: "#8b93a7",
+              fontSize: 10,
+              fontWeight: 700
             }}
           >
-            {RANGE_OPTIONS.map(
-              (option) => {
-                const active =
-                  rangeDays ===
-                  option.days;
-
-                return (
-                  <button
-                    key={
-                      option.days
-                    }
-                    type="button"
-                    onClick={() =>
-                      setRangeDays(
-                        option.days
-                      )
-                    }
-                    style={{
-                      border:
-                        active
-                          ? "1px solid #5368e8"
-                          : "1px solid transparent",
-                      background:
-                        active
-                          ? "#ffffff"
-                          : "transparent",
-                      color:
-                        active
-                          ? "#3448c5"
-                          : "#667085",
-                      borderRadius:
-                        7,
-                      padding:
-                        "7px 10px",
-                      fontSize: 11,
-                      fontWeight:
-                        800,
-                      cursor:
-                        "pointer",
-                      boxShadow:
-                        active
-                          ? "0 1px 3px rgba(16,24,40,.08)"
-                          : "none"
-                    }}
-                  >
-                    {
-                      option.label
-                    }
-                  </button>
-                );
-              }
-            )}
-          </div>
+            Period: {periodLabel}
+          </span>
 
           <button
             type="button"

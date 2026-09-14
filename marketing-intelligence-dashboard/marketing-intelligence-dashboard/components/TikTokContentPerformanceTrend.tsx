@@ -20,16 +20,18 @@ type ContentItem = {
   shares: number;
 };
 
+export type TikTokContentRangeDays = 7 | 30 | 90 | 180 | 365;
+
 type Props = {
   content: ContentItem[];
   anchorDate?: string | null;
+  rangeDays: TikTokContentRangeDays;
+  onRangeChange: (days: TikTokContentRangeDays) => void;
 };
-
-type RangeDays = 7 | 30 | 90 | 180 | 365;
 type MetricKey = "views" | "likes" | "comments" | "shares" | "er";
 
 const RANGE_OPTIONS: Array<{
-  days: RangeDays;
+  days: TikTokContentRangeDays;
   label: string;
 }> = [
   { days: 7, label: "7D" },
@@ -141,11 +143,10 @@ function getAnchorDate(
 
 export default function TikTokContentPerformanceTrend({
   content,
-  anchorDate
+  anchorDate,
+  rangeDays,
+  onRangeChange
 }: Props) {
-  const [rangeDays, setRangeDays] =
-    useState<RangeDays>(7);
-
   const [metric, setMetric] =
     useState<MetricKey>("views");
 
@@ -372,7 +373,7 @@ export default function TikTokContentPerformanceTrend({
                 key={option.days}
                 type="button"
                 onClick={() =>
-                  setRangeDays(option.days)
+                  onRangeChange(option.days)
                 }
                 style={{
                   border: active
