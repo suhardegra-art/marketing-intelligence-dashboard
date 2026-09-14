@@ -16,31 +16,31 @@ type AnalysisRequest = {
 };
 
 const RESPONSE_SCHEMA = {
-  type: "OBJECT",
+  type: "object",
   properties: {
     executive_summary: {
-      type: "STRING"
+      type: "string"
     },
     whats_working: {
-      type: "ARRAY",
+      type: "array",
       items: {
-        type: "STRING"
+        type: "string"
       }
     },
     needs_attention: {
-      type: "ARRAY",
+      type: "array",
       items: {
-        type: "STRING"
+        type: "string"
       }
     },
     recommended_actions: {
-      type: "ARRAY",
+      type: "array",
       items: {
-        type: "STRING"
+        type: "string"
       }
     },
     confidence_note: {
-      type: "STRING"
+      type: "string"
     }
   },
   required: [
@@ -61,6 +61,7 @@ function getOutputText(payload: any) {
   }
 
   return parts
+    .filter((part: any) => !part?.thought)
     .map((part: any) =>
       typeof part?.text === "string"
         ? part.text
@@ -68,6 +69,43 @@ function getOutputText(payload: any) {
     )
     .join("")
     .trim();
+}
+
+function stripCodeFence(value: string) {
+  return value
+    .replace(/^```json\s*/i, "")
+    .replace(/^```\s*/i, "")
+    .replace(/\s*```$/i, "")
+    .trim();
+}
+
+function extractJsonObject(value: string) {
+  const cleaned = stripCodeFence(value);
+
+  if (
+    cleaned.startsWith("{") &&
+    cleaned.endsWith("}")
+  ) {
+    return cleaned;
+  }
+
+  const firstBrace =
+    cleaned.indexOf("{");
+
+  const lastBrace =
+    cleaned.lastIndexOf("}");
+
+  if (
+    firstBrace >= 0 &&
+    lastBrace > firstBrace
+  ) {
+    return cleaned.slice(
+      firstBrace,
+      lastBrace + 1
+    );
+  }
+
+  return cleaned;
 }
 
 export async function POST(
@@ -113,7 +151,8 @@ export async function POST(
       "gemini-3.6-flash";
 
     const language =
-      body.language || "Bahasa Indonesia";
+      body.language ||
+      "Bahasa Indonesia";
 
     const systemInstruction = `
 You are a senior social media performance analyst.
@@ -191,15 +230,37 @@ ${JSON.stringify(body.data)}
               "application/json",
             responseSchema:
               RESPONSE_SCHEMA,
-            maxOutputTokens: 1400
+            maxOutputTokens: 4096
           }
         }),
         cache: "no-store"
       }
     );
 
-    const payload =
-      await response.json();
+    const rawBody =
+      await response.text();
+
+    let payload: any = null;
+
+    try {
+      payload =
+        rawBody
+          ? JSON.parse(rawBody)
+          : {};
+    } catch {
+      return NextResponse.json(
+        {
+          error:
+            `Gemini API returned a non-JSON HTTP response (${response.status}).`
+        },
+        {
+          status:
+            response.ok
+              ? 502
+              : response.status
+        }
+      );
+    }
 
     if (!response.ok) {
       const message =
@@ -216,6 +277,9 @@ ${JSON.stringify(body.data)}
       );
     }
 
+    const finishReason =
+      payload?.candidates?.[0]?.finishReason;
+
     const outputText =
       getOutputText(payload);
 
@@ -223,7 +287,9 @@ ${JSON.stringify(body.data)}
       return NextResponse.json(
         {
           error:
-            "Gemini returned an empty response."
+            finishReason
+              ? `Gemini returned an empty response. Finish reason: ${finishReason}.`
+              : "Gemini returned an empty response."
         },
         {
           status: 502
@@ -231,16 +297,36 @@ ${JSON.stringify(body.data)}
       );
     }
 
+    const jsonText =
+      extractJsonObject(
+        outputText
+      );
+
     let analysis;
 
     try {
       analysis =
-        JSON.parse(outputText);
+        JSON.parse(jsonText);
     } catch {
+      console.error(
+        "Gemini JSON parse error",
+        {
+          finishReason,
+          outputPreview:
+            outputText.slice(
+              0,
+              800
+            )
+        }
+      );
+
       return NextResponse.json(
         {
           error:
-            "Gemini response could not be parsed as JSON."
+            finishReason ===
+            "MAX_TOKENS"
+              ? "Gemini response was truncated before the JSON was complete. Please try again."
+              : "Gemini returned an incomplete or invalid structured response. Please try again."
         },
         {
           status: 502
