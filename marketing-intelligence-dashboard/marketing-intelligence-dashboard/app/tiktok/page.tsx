@@ -1019,4 +1019,313 @@ export default async function TikTokPage({
                         {formatDate(
                           item.publishedAt
                         )}{" "}
-                        • ER{"
+{" "}
+                      {engagementRate(
+                        item
+                      ).toFixed(2)}%
+                      </div>
+                  </div>
+
+                  <strong>
+                    {formatCompact(
+                      item.views
+                    )}
+                  </strong>
+
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+
+
+        <section className="panel table-panel">
+
+          <div className="panel-header">
+
+            <div>
+
+              <h3>
+                TikTok Content
+              </h3>
+
+              <p>
+                {data.periodVideos} videos in selected period •{" "}
+                {data.loadedVideos} total videos stored
+              </p>
+
+            </div>
+
+            <TikTokExportButton />
+
+          </div>
+
+
+          <div className="table-wrap">
+
+            <table>
+
+              <thead>
+
+                <tr>
+                  <th>Date</th>
+                  <th>Content</th>
+                  <th>Views</th>
+                  <th>Likes</th>
+                  <th>Comments</th>
+                  <th>Shares</th>
+                  <th>ER</th>
+                  <th>Link</th>
+                </tr>
+
+              </thead>
+
+
+              <tbody>
+
+                {data.content.map(
+                  (item) => (
+
+                    <tr
+                      key={item.id}
+                    >
+
+                      <td>
+                        {formatDate(
+                          item.publishedAt
+                        )}
+                      </td>
+
+
+                      <td
+                        style={{
+                          maxWidth: 360
+                        }}
+                      >
+
+                        <div
+                          style={{
+                            overflow:
+                              "hidden",
+                            whiteSpace:
+                              "nowrap",
+                            textOverflow:
+                              "ellipsis"
+                          }}
+                        >
+                          {item.title}
+                        </div>
+
+                      </td>
+
+
+                      <td>
+                        {formatNumber(
+                          item.views
+                        )}
+                      </td>
+
+
+                      <td>
+                        {formatNumber(
+                          item.likes
+                        )}
+                      </td>
+
+
+                      <td>
+                        {formatNumber(
+                          item.comments
+                        )}
+                      </td>
+
+
+                      <td>
+                        {formatNumber(
+                          item.shares
+                        )}
+                      </td>
+
+
+                      <td>
+                        {engagementRate(
+                          item
+                        ).toFixed(2)}%
+                      </td>
+
+
+                      <td>
+
+                        {item.permalink ? (
+
+                          <a
+                            href={
+                              item.permalink
+                            }
+                            target="_blank"
+                            rel="noreferrer"
+                            style={{
+                              color:
+                                "#5364d8",
+                              fontWeight:
+                                800,
+                              textDecoration:
+                                "none"
+                            }}
+                          >
+                            Open ↗
+                          </a>
+
+                        ) : (
+
+                          "—"
+
+                        )}
+
+                      </td>
+
+                    </tr>
+
+                  )
+                )}
+
+              </tbody>
+
+            </table>
+
+          </div>
+
+        </section>
+
+
+        <section
+          className="panel"
+          style={{
+            marginBottom: 16,
+            background:
+              "#f8f9fe",
+            borderStyle:
+              "dashed"
+          }}
+        >
+
+          <strong
+            style={{
+              display: "block",
+              marginBottom: 6
+            }}
+          >
+            How the date range works
+          </strong>
+
+
+          <p
+            style={{
+              margin: 0,
+              color: "#7a839d",
+              fontSize: 11,
+              lineHeight: 1.6
+            }}
+          >
+            The From/To filter selects videos by their TikTok publish date.
+            Growth Comparison uses daily snapshots: with no date selected it
+            shows the latest available 30-day trend, while a complete From/To
+            selection automatically compares the chosen period with the
+            immediately preceding period of equal length.
+          </p>
+
+        </section>
+
+
+        <section
+          className="panel"
+          style={{
+            marginBottom: 16
+          }}
+        >
+
+          {!data.connected ? (
+
+            <section
+              className="panel"
+              style={{
+                marginBottom: 16
+              }}
+            >
+
+              <h3
+                style={{
+                  marginTop: 0
+                }}
+              >
+                TikTok data unavailable
+              </h3>
+
+
+              <p
+                style={{
+                  color: "#7a839d",
+                  marginBottom: 16
+                }}
+              >
+                {data.message}
+              </p>
+
+
+              <a
+                href="/api/tiktok/connect"
+                style={{
+                  display:
+                    "inline-flex",
+                  background:
+                    "#111827",
+                  color:
+                    "white",
+                  textDecoration:
+                    "none",
+                  padding:
+                    "10px 15px",
+                  borderRadius:
+                    9,
+                  fontWeight:
+                    800,
+                  fontSize:
+                    12
+                }}
+              >
+                Connect TikTok
+              </a>
+
+            </section>
+
+          ) : (
+
+            <SyncAllTikTokButton
+              currentLoaded={
+                data.loadedVideos
+              }
+              expectedTotal={
+                data.videoCount
+              }
+            />
+
+          )}
+
+
+          <TikTokSyncMonitoring />
+
+        </section>
+
+
+        <footer>
+          TikTok Performance • Live Supabase Data
+        </footer>
+
+
+      </main>
+
+    </div>
+
+  );
+
+}
