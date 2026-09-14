@@ -1,6 +1,7 @@
 import Sidebar from "@/components/Sidebar";
 import SyncAllTikTokButton from "@/app/tiktok/SyncAllTikTokButton";
 import TikTokGrowthComparison from "@/components/TikTokGrowthComparison";
+import TikTokContentPerformanceTrend from "@/components/TikTokContentPerformanceTrend";
 import { getTikTokDashboardData } from "@/lib/tiktok-dashboard";
 import { getTikTokHistory } from "@/lib/tiktok-history";
 import { getTikTokGrowthData } from "@/lib/tiktok-growth";
@@ -74,7 +75,7 @@ export default async function TikTokPage({
 }: TikTokPageProps) {
   const params = await searchParams;
 
-  const [data, history] =
+  const [data, history, contentTrendData] =
     await Promise.all([
       getTikTokDashboardData({
         from: params.from,
@@ -83,7 +84,8 @@ export default async function TikTokPage({
       getTikTokHistory({
         from: params.from,
         to: params.to
-      })
+      }),
+      getTikTokDashboardData({})
     ]);
 
   const growthTo =
@@ -834,6 +836,13 @@ export default async function TikTokPage({
             </div>
           )}
         </section>
+
+        <TikTokContentPerformanceTrend
+          content={contentTrendData.content}
+          anchorDate={
+            contentTrendData.snapshotDate
+          }
+        />
 
         <section className="panel table-panel">
           <div className="panel-header">
