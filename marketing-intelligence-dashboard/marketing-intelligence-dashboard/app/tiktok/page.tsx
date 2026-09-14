@@ -16,13 +16,6 @@ type TikTokPageProps = {
   }>;
 };
 
-type DailyMetric = {
-  views: number;
-  likes: number;
-  comments: number;
-  shares: number;
-};
-
 function formatNumber(value: number) {
   return new Intl.NumberFormat("en-US").format(value);
 }
@@ -76,143 +69,12 @@ function periodLabel(
   return "All publish dates";
 }
 
-function buildGrowthComparisonData(growthData: any) {
-  const currentDaily: Record<string, DailyMetric> = {};
-  const previousDaily: Record<string, DailyMetric> = {};
-  const currentFollowers: Record<string, number> = {};
-  const previousFollowers: Record<string, number> = {};
-
-  if (!growthData) {
-    return {
-      currentDaily,
-      previousDaily,
-      currentFollowers,
-      previousFollowers,
-      from: "",
-      to: "",
-      previousFrom: "",
-      previousTo: ""
-    };
-  }
-
-  const metrics = growthData.metrics || [];
-
-  const ensureCurrent = (date: string) => {
-    if (!currentDaily[date]) {
-      currentDaily[date] = {
-        views: 0,
-        likes: 0,
-        comments: 0,
-        shares: 0
-      };
-    }
-
-    return currentDaily[date];
-  };
-
-  const ensurePrevious = (date: string) => {
-    if (!previousDaily[date]) {
-      previousDaily[date] = {
-        views: 0,
-        likes: 0,
-        comments: 0,
-        shares: 0
-      };
-    }
-
-    return previousDaily[date];
-  };
-
-  const followerMetric = metrics.find(
-    (item: any) => item.key === "followers"
-  );
-
-  (followerMetric?.currentSeries || []).forEach(
-    (point: any) => {
-      currentFollowers[point.date] =
-        Number(point.value || 0);
-    }
-  );
-
-  (followerMetric?.previousSeries || []).forEach(
-    (point: any) => {
-      previousFollowers[point.date] =
-        Number(point.value || 0);
-    }
-  );
-
-  const viewsMetric = metrics.find(
-    (item: any) => item.key === "views"
-  );
-
-  (viewsMetric?.currentSeries || []).forEach(
-    (point: any) => {
-      ensureCurrent(point.date).views =
-        Number(point.value || 0);
-    }
-  );
-
-  (viewsMetric?.previousSeries || []).forEach(
-    (point: any) => {
-      ensurePrevious(point.date).views =
-        Number(point.value || 0);
-    }
-  );
-
-  const likesMetric = metrics.find(
-    (item: any) => item.key === "likes"
-  );
-
-  (likesMetric?.currentSeries || []).forEach(
-    (point: any) => {
-      ensureCurrent(point.date).likes =
-        Number(point.value || 0);
-    }
-  );
-
-  (likesMetric?.previousSeries || []).forEach(
-    (point: any) => {
-      ensurePrevious(point.date).likes =
-        Number(point.value || 0);
-    }
-  );
-
-  const commentsSharesMetric = metrics.find(
-    (item: any) => item.key === "commentsShares"
-  );
-
-  (commentsSharesMetric?.currentSeries || []).forEach(
-    (point: any) => {
-      ensureCurrent(point.date).comments =
-        Number(point.value || 0);
-    }
-  );
-
-  (commentsSharesMetric?.previousSeries || []).forEach(
-    (point: any) => {
-      ensurePrevious(point.date).comments =
-        Number(point.value || 0);
-    }
-  );
-
-  return {
-    currentDaily,
-    previousDaily,
-    currentFollowers,
-    previousFollowers,
-    from: growthData.currentFrom || "",
-    to: growthData.currentTo || "",
-    previousFrom: growthData.previousFrom || "",
-    previousTo: growthData.previousTo || ""
-  };
-}
-
 export default async function TikTokPage({
   searchParams
 }: TikTokPageProps) {
   const params = await searchParams;
 
-  const [data, history, growthData] =
+  const [data, history] =
     await Promise.all([
       getTikTokDashboardData({
         from: params.from,
@@ -221,15 +83,28 @@ export default async function TikTokPage({
       getTikTokHistory({
         from: params.from,
         to: params.to
-      }),
-      getTikTokGrowthData({
-        from: params.from,
-        to: params.to
       })
     ]);
 
-  const growthComparison =
-    buildGrowthComparisonData(growthData);
+  const growthTo =
+    data.snapshotDate ||
+    new Date().toISOString().slice(0, 10);
+
+  const growthStart =
+    new Date(`${growthTo}T00:00:00Z`);
+
+  growthStart.setUTCDate(
+    growthStart.getUTCDate() - 89
+  );
+
+  const growthFrom =
+    growthStart.toISOString().slice(0, 10);
+
+  const growthData =
+    await getTikTokGrowthData({
+      from: growthFrom,
+      to: growthTo
+    });
 
   const topContent = [...data.content]
     .sort((a, b) => b.views - a.views)
@@ -622,26 +497,7 @@ export default async function TikTokPage({
         </section>
 
         <TikTokGrowthComparison
-          currentDaily={
-            growthComparison.currentDaily
-          }
-          previousDaily={
-            growthComparison.previousDaily
-          }
-          currentFollowers={
-            growthComparison.currentFollowers
-          }
-          previousFollowers={
-            growthComparison.previousFollowers
-          }
-          from={growthComparison.from}
-          to={growthComparison.to}
-          previousFrom={
-            growthComparison.previousFrom
-          }
-          previousTo={
-            growthComparison.previousTo
-          }
+          data={growthData}
         />
 
         <section className="two-column">

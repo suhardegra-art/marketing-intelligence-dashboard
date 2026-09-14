@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import {
   LineChart,
   Line,
@@ -8,241 +8,170 @@ import {
   YAxis,
   Tooltip,
   ResponsiveContainer,
-  CartesianGrid,
+  CartesianGrid
 } from "recharts";
-
-
-type DailyMetric = {
-  views: number;
-  likes: number;
-  comments: number;
-  shares: number;
-};
-
+import type {
+  GrowthPoint,
+  TikTokGrowthData
+} from "@/lib/tiktok-growth";
 
 type Props = {
-  currentDaily: Record<string, DailyMetric>;
-  previousDaily: Record<string, DailyMetric>;
-
-  currentFollowers: Record<string, number>;
-  previousFollowers: Record<string, number>;
-
-  from: string;
-  to: string;
-
-  previousFrom: string;
-  previousTo: string;
+  data: TikTokGrowthData | null;
 };
 
+type RangeDays = 7 | 30 | 60 | 90;
+
+type Card = {
+  key: string;
+  title: string;
+  value: number;
+  valueType: "number" | "percentage";
+  chart: Array<{
+    date: string;
+    label: string;
+    value: number;
+  }>;
+};
+
+const RANGE_OPTIONS: RangeDays[] = [7, 30, 60, 90];
 
 function formatNumber(value: number) {
-
-  return new Intl.NumberFormat(
-    "en-US"
-  ).format(value);
-
+  return new Intl.NumberFormat("en-US").format(
+    Math.round(value)
+  );
 }
-
 
 function formatCompact(value: number) {
+  const absolute = Math.abs(value);
 
-  if (Math.abs(value) >= 1000000) {
-
-    return (
-      (value / 1000000)
-        .toFixed(1)
-        .replace(".0", "")
-      + "M"
-    );
-
+  if (absolute >= 1000000) {
+    return `${(value / 1000000)
+      .toFixed(1)
+      .replace(".0", "")}M`;
   }
 
-
-  if (Math.abs(value) >= 1000) {
-
-    return (
-      (value / 1000)
-        .toFixed(1)
-        .replace(".0", "")
-      + "K"
-    );
-
+  if (absolute >= 1000) {
+    return `${(value / 1000)
+      .toFixed(1)
+      .replace(".0", "")}K`;
   }
-
 
   return formatNumber(value);
-
 }
 
-
 function formatDate(date: string) {
+  if (!date) return "-";
 
-  if (!date) {
-    return "-";
-  }
-
-
-  const value =
-    new Date(
-      `${date}T00:00:00`
-    );
-
-
-  return value.toLocaleDateString(
+  return new Date(`${date}T00:00:00Z`).toLocaleDateString(
     "en-GB",
     {
       day: "2-digit",
-      month: "short",
+      month: "short"
     }
   );
-
 }
 
-
-function getDates(
-  from: string,
-  to: string
-) {
-
-  const result: string[] = [];
-
-  const start =
-    new Date(
-      `${from}T00:00:00`
-    );
-
-  const end =
-    new Date(
-      `${to}T00:00:00`
-    );
-
-
-  while (
-    start.getTime() <=
-    end.getTime()
-  ) {
-
-    result.push(
-      start
-        .toISOString()
-        .slice(0, 10)
-    );
-
-
-    start.setDate(
-      start.getDate() + 1
-    );
-
-  }
-
-
-  return result;
-
+function addDays(date: string, days: number) {
+  const value = new Date(`${date}T00:00:00Z`);
+  value.setUTCDate(value.getUTCDate() + days);
+  return value.toISOString().slice(0, 10);
 }
 
-
-function growthRate(
-  current: number,
-  previous: number
+function filterSeries(
+  series: GrowthPoint[],
+  endDate: string,
+  days: number
 ) {
+  if (!endDate) return [];
 
-  if (!previous) {
-    return null;
-  }
+  const fromDate = addDays(endDate, -(days - 1));
 
+  return series.filter(
+    (point) =>
+      point.date >= fromDate &&
+      point.date <= endDate
+  );
+}
+
+function seriesDelta(series: GrowthPoint[]) {
+  if (series.length < 2) return 0;
 
   return (
-    ((current - previous) /
-      previous) *
-    100
+    series[series.length - 1].value -
+    series[0].value
   );
-
 }
 
+function normaliseDeltaSeries(series: GrowthPoint[]) {
+  if (series.length === 0) return [];
 
-function GrowthBadge({
-  current,
-  previous,
-}: {
-  current: number;
-  previous: number;
-}) {
+  const baseline = series[0].value;
 
-  const growth =
-    growthRate(
-      current,
-      previous
-    );
-
-
-  if (growth === null) {
-    return (
-      <span
-        style={{
-          fontSize: 11,
-          color: "#9ca3af",
-        }}
-      >
-        No previous data
-      </span>
-    );
-  }
-
-
-  return (
-    <span
-      style={{
-        fontSize: 11,
-        fontWeight: 700,
-        color:
-          growth >= 0
-            ? "#16a34a"
-            : "#dc2626",
-      }}
-    >
-      {growth >= 0 ? "↑" : "↓"}{" "}
-      {Math.abs(growth).toFixed(1)}%
-    </span>
-  );
-
+  return series.map((point) => ({
+    date: point.date,
+    label: formatDate(point.date),
+    value: point.value - baseline
+  }));
 }
 
+function normalisePercentSeries(series: GrowthPoint[]) {
+  if (series.length === 0) return [];
+
+  const baseline = series[0].value;
+
+  return series.map((point) => ({
+    date: point.date,
+    label: formatDate(point.date),
+    value:
+      baseline > 0
+        ? ((point.value - baseline) / baseline) * 100
+        : 0
+  }));
+}
 
 function MetricChart({
   data,
-  currentKey,
-  previousKey,
-  valueFormat = "number",
+  valueType
 }: {
-  data: any[];
-  currentKey: string;
-  previousKey: string;
-  valueFormat?: "number" | "compact";
+  data: Card["chart"];
+  valueType: Card["valueType"];
 }) {
+  if (data.length === 0) {
+    return (
+      <div
+        style={{
+          height: 125,
+          marginTop: 12,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          color: "#98a2b3",
+          fontSize: 11,
+          borderTop: "1px dashed #edf0f7"
+        }}
+      >
+        Historical data not available yet
+      </div>
+    );
+  }
 
   return (
     <div
       style={{
         height: 125,
-        marginTop: 12,
+        marginTop: 12
       }}
     >
-
-      <ResponsiveContainer
-        width="100%"
-        height="100%"
-      >
-
+      <ResponsiveContainer width="100%" height="100%">
         <LineChart
           data={data}
           margin={{
             top: 5,
             right: 4,
             left: 0,
-            bottom: 0,
+            bottom: 0
           }}
         >
-
           <CartesianGrid
             strokeDasharray="3 3"
             vertical={false}
@@ -253,737 +182,306 @@ function MetricChart({
             dataKey="label"
             tick={{
               fontSize: 9,
-              fill: "#8b93a7",
+              fill: "#8b93a7"
             }}
             axisLine={false}
             tickLine={false}
             interval="preserveStartEnd"
           />
 
-          <YAxis
-            hide
-          />
+          <YAxis hide />
 
           <Tooltip
-            formatter={(value: any) => {
-
-              const number =
-                Number(value || 0);
+            formatter={(value: number | string) => {
+              const numeric = Number(value || 0);
 
               return [
-                valueFormat === "compact"
-                  ? formatCompact(number)
-                  : formatNumber(number),
-                "",
+                valueType === "percentage"
+                  ? `${numeric.toFixed(1)}%`
+                  : formatCompact(numeric),
+                ""
               ];
-
             }}
+            labelFormatter={(label) => String(label)}
           />
 
           <Line
             type="monotone"
-            dataKey={currentKey}
+            dataKey="value"
             stroke="#5368e8"
             strokeWidth={2.5}
             dot={false}
-            activeDot={{
-              r: 4,
-            }}
+            activeDot={{ r: 4 }}
           />
-
-          <Line
-            type="monotone"
-            dataKey={previousKey}
-            stroke="#c9cef0"
-            strokeWidth={2}
-            dot={false}
-            activeDot={{
-              r: 3,
-            }}
-          />
-
         </LineChart>
-
       </ResponsiveContainer>
-
     </div>
   );
-
 }
 
-
 export default function TikTokGrowthComparison({
-  currentDaily,
-  previousDaily,
-  currentFollowers,
-  previousFollowers,
-  from,
-  to,
-  previousFrom,
-  previousTo,
+  data
 }: Props) {
+  const [rangeDays, setRangeDays] =
+    useState<RangeDays>(30);
 
+  const cards = useMemo<Card[]>(() => {
+    if (!data) return [];
 
-  const dates =
-    useMemo(
-      () =>
-        getDates(
-          from,
-          to
-        ),
-      [from, to]
+    const followerMetric = data.metrics.find(
+      (item) => item.key === "followers"
+    );
+    const viewsMetric = data.metrics.find(
+      (item) => item.key === "views"
+    );
+    const likesMetric = data.metrics.find(
+      (item) => item.key === "likes"
+    );
+    const commentsSharesMetric = data.metrics.find(
+      (item) => item.key === "commentsShares"
     );
 
-
-  const previousDates =
-    useMemo(
-      () =>
-        getDates(
-          previousFrom,
-          previousTo
-        ),
-      [
-        previousFrom,
-        previousTo,
-      ]
+    const followerSeries = filterSeries(
+      followerMetric?.currentSeries || [],
+      data.currentTo,
+      rangeDays
     );
 
-
-  const chartData =
-    useMemo(() => {
-
-      return dates.map(
-        (
-          date,
-          index
-        ) => {
-
-          const previousDate =
-            previousDates[index];
-
-
-          const current =
-            currentDaily[date] || {
-              views: 0,
-              likes: 0,
-              comments: 0,
-              shares: 0,
-            };
-
-
-          const previous =
-            previousDaily[
-              previousDate
-            ] || {
-              views: 0,
-              likes: 0,
-              comments: 0,
-              shares: 0,
-            };
-
-
-          return {
-
-            label:
-              formatDate(date),
-
-            currentViews:
-              current.views,
-
-            previousViews:
-              previous.views,
-
-            currentLikes:
-              current.likes,
-
-            previousLikes:
-              previous.likes,
-
-            currentCommentsShares:
-              current.comments +
-              current.shares,
-
-            previousCommentsShares:
-              previous.comments +
-              previous.shares,
-
-            currentFollowers:
-              currentFollowers[date] || 0,
-
-            previousFollowers:
-              previousFollowers[
-                previousDate
-              ] || 0,
-
-          };
-
-        }
-      );
-
-    }, [
-      dates,
-      previousDates,
-      currentDaily,
-      previousDaily,
-      currentFollowers,
-      previousFollowers,
-    ]);
-
-
-
-
-  const totalViews =
-    dates.reduce(
-      (
-        sum,
-        date
-      ) =>
-        sum +
-        Number(
-          currentDaily[date]
-            ?.views || 0
-        ),
-      0
+    const viewsSeries = filterSeries(
+      viewsMetric?.currentSeries || [],
+      data.currentTo,
+      rangeDays
     );
 
-
-  const previousTotalViews =
-    previousDates.reduce(
-      (
-        sum,
-        date
-      ) =>
-        sum +
-        Number(
-          previousDaily[date]
-            ?.views || 0
-        ),
-      0
+    const likesSeries = filterSeries(
+      likesMetric?.currentSeries || [],
+      data.currentTo,
+      rangeDays
     );
 
-
-
-  const totalLikes =
-    dates.reduce(
-      (
-        sum,
-        date
-      ) =>
-        sum +
-        Number(
-          currentDaily[date]
-            ?.likes || 0
-        ),
-      0
+    const commentsSharesSeries = filterSeries(
+      commentsSharesMetric?.currentSeries || [],
+      data.currentTo,
+      rangeDays
     );
 
+    const followerDelta = seriesDelta(followerSeries);
 
-  const previousTotalLikes =
-    previousDates.reduce(
-      (
-        sum,
-        date
-      ) =>
-        sum +
-        Number(
-          previousDaily[date]
-            ?.likes || 0
-        ),
-      0
-    );
+    const followerGrowth =
+      followerSeries.length >= 2 &&
+      followerSeries[0].value > 0
+        ? (followerDelta / followerSeries[0].value) * 100
+        : 0;
 
-
-
-  const totalCommentsShares =
-    dates.reduce(
-      (
-        sum,
-        date
-      ) => {
-
-        const row =
-          currentDaily[date];
-
-        return (
-          sum +
-          Number(
-            row?.comments || 0
-          ) +
-          Number(
-            row?.shares || 0
-          )
-        );
-
+    return [
+      {
+        key: "followerGrowth",
+        title: "Follower Growth",
+        value: followerGrowth,
+        valueType: "percentage",
+        chart: normalisePercentSeries(followerSeries)
       },
-      0
-    );
-
-
-  const previousCommentsShares =
-    previousDates.reduce(
-      (
-        sum,
-        date
-      ) => {
-
-        const row =
-          previousDaily[date];
-
-        return (
-          sum +
-          Number(
-            row?.comments || 0
-          ) +
-          Number(
-            row?.shares || 0
-          )
-        );
-
+      {
+        key: "views",
+        title: "Views",
+        value: Math.max(0, seriesDelta(viewsSeries)),
+        valueType: "number",
+        chart: normaliseDeltaSeries(viewsSeries)
       },
-      0
-    );
+      {
+        key: "likes",
+        title: "Likes",
+        value: Math.max(0, seriesDelta(likesSeries)),
+        valueType: "number",
+        chart: normaliseDeltaSeries(likesSeries)
+      },
+      {
+        key: "commentsShares",
+        title: "Comments & Shares",
+        value: Math.max(
+          0,
+          seriesDelta(commentsSharesSeries)
+        ),
+        valueType: "number",
+        chart: normaliseDeltaSeries(commentsSharesSeries)
+      },
+      {
+        key: "newFollowers",
+        title: "New Followers",
+        value: Math.max(0, followerDelta),
+        valueType: "number",
+        chart: normaliseDeltaSeries(followerSeries)
+      }
+    ];
+  }, [data, rangeDays]);
 
-
-
-  const firstFollower =
-    dates.length > 0
-      ? Number(
-          currentFollowers[
-            dates[0]
-          ] || 0
-        )
-      : 0;
-
-
-  const lastFollower =
-    dates.length > 0
-      ? Number(
-          currentFollowers[
-            dates[
-              dates.length - 1
-            ]
-          ] || 0
-        )
-      : 0;
-
-
-  const previousFirstFollower =
-    previousDates.length > 0
-      ? Number(
-          previousFollowers[
-            previousDates[0]
-          ] || 0
-        )
-      : 0;
-
-
-  const previousLastFollower =
-    previousDates.length > 0
-      ? Number(
-          previousFollowers[
-            previousDates[
-              previousDates.length - 1
-            ]
-          ] || 0
-        )
-      : 0;
-
-
-
-  const newFollowers =
-    Math.max(
-      0,
-      lastFollower -
-      firstFollower
-    );
-
-
-  const previousNewFollowers =
-    Math.max(
-      0,
-      previousLastFollower -
-      previousFirstFollower
-    );
-
-
-
-  const followerGrowth =
-    firstFollower > 0
-      ? (
-          (
-            lastFollower -
-            firstFollower
-          )
-          /
-          firstFollower
-        ) * 100
-      : 0;
-
-
-  const previousFollowerGrowth =
-    previousFirstFollower > 0
-      ? (
-          (
-            previousLastFollower -
-            previousFirstFollower
-          )
-          /
-          previousFirstFollower
-        ) * 100
-      : 0;
-
-
-
-  const cards = [
-
-    {
-      title:
-        "Follower Growth",
-
-      value:
-        followerGrowth,
-
-      previous:
-        previousFollowerGrowth,
-
-      type:
-        "percentage",
-
-      currentLabel:
-        `${formatCompact(lastFollower)} followers`,
-
-      previousLabel:
-        `${formatCompact(previousLastFollower)} followers`,
-
-      dataKey:
-        "currentFollowers",
-
-      previousKey:
-        "previousFollowers",
-
-    },
-
-    {
-      title:
-        "Views",
-
-      value:
-        totalViews,
-
-      previous:
-        previousTotalViews,
-
-      type:
-        "number",
-
-      dataKey:
-        "currentViews",
-
-      previousKey:
-        "previousViews",
-
-    },
-
-    {
-      title:
-        "Likes",
-
-      value:
-        totalLikes,
-
-      previous:
-        previousTotalLikes,
-
-      type:
-        "number",
-
-      dataKey:
-        "currentLikes",
-
-      previousKey:
-        "previousLikes",
-
-    },
-
-    {
-      title:
-        "Comments & Shares",
-
-      value:
-        totalCommentsShares,
-
-      previous:
-        previousCommentsShares,
-
-      type:
-        "number",
-
-      dataKey:
-        "currentCommentsShares",
-
-      previousKey:
-        "previousCommentsShares",
-
-    },
-
-    {
-      title:
-        "New Followers",
-
-      value:
-        newFollowers,
-
-      previous:
-        previousNewFollowers,
-
-      type:
-        "number",
-
-      dataKey:
-        "currentFollowers",
-
-      previousKey:
-        "previousFollowers",
-
-    },
-
-  ];
-
-
+  const rangeFrom = data?.currentTo
+    ? addDays(data.currentTo, -(rangeDays - 1))
+    : "";
 
   return (
-
     <section
       className="panel"
       style={{
         marginTop: 16,
-        padding: 16,
+        padding: 16
       }}
     >
-
       <div
         style={{
           display: "flex",
-          justifyContent:
-            "space-between",
-          alignItems:
-            "center",
+          justifyContent: "space-between",
+          alignItems: "flex-start",
           marginBottom: 16,
-          gap: 12,
+          gap: 16,
+          flexWrap: "wrap"
         }}
       >
-
         <div>
-
           <h3
             style={{
               margin: 0,
-              fontSize: 18,
+              fontSize: 18
             }}
           >
-            TikTok Growth Comparison
+            TikTok Growth
           </h3>
 
           <p
             style={{
-              margin:
-                "4px 0 0",
-              color:
-                "#8b93a7",
-              fontSize: 12,
+              margin: "4px 0 0",
+              color: "#8b93a7",
+              fontSize: 12
             }}
           >
-            Selected date range compared automatically with the previous period of equal length.
+            Historical TikTok performance based on available daily API snapshots.
           </p>
 
+          {rangeFrom && data?.currentTo ? (
+            <div
+              style={{
+                marginTop: 5,
+                color: "#98a2b3",
+                fontSize: 10
+              }}
+            >
+              {formatDate(rangeFrom)} – {formatDate(data.currentTo)}
+            </div>
+          ) : null}
         </div>
-
 
         <div
           style={{
-            fontSize: 11,
-            fontWeight: 700,
-            color: "#667085",
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 4,
+            padding: 4,
             background: "#f7f8fc",
-            border:
-              "1px solid #e5e7ef",
-            borderRadius: 10,
-            padding:
-              "8px 12px",
-            whiteSpace:
-              "nowrap",
+            border: "1px solid #e5e7ef",
+            borderRadius: 10
           }}
         >
-          {formatDate(from)}
-          {" – "}
-          {formatDate(to)}
-          {" vs "}
-          {formatDate(previousFrom)}
-          {" – "}
-          {formatDate(previousTo)}
-        </div>
+          {RANGE_OPTIONS.map((days) => {
+            const active = rangeDays === days;
 
+            return (
+              <button
+                key={days}
+                type="button"
+                onClick={() => setRangeDays(days)}
+                style={{
+                  border: active
+                    ? "1px solid #5368e8"
+                    : "1px solid transparent",
+                  background: active
+                    ? "#ffffff"
+                    : "transparent",
+                  color: active
+                    ? "#3448c5"
+                    : "#667085",
+                  borderRadius: 7,
+                  padding: "7px 10px",
+                  fontSize: 11,
+                  fontWeight: 800,
+                  cursor: "pointer",
+                  boxShadow: active
+                    ? "0 1px 3px rgba(16,24,40,.08)"
+                    : "none"
+                }}
+              >
+                {days}D
+              </button>
+            );
+          })}
+        </div>
       </div>
 
-
-
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns:
-            "repeat(5,minmax(0,1fr))",
-          gap: 12,
-        }}
-      >
-
-        {cards.map(
-          (card) => (
-
+      {!data ? (
+        <div
+          style={{
+            padding: "28px 12px",
+            textAlign: "center",
+            color: "#98a2b3",
+            fontSize: 12
+          }}
+        >
+          TikTok historical data is not available yet.
+        </div>
+      ) : (
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns:
+              "repeat(5,minmax(0,1fr))",
+            gap: 12
+          }}
+        >
+          {cards.map((card) => (
             <div
-              key={card.title}
+              key={card.key}
               style={{
                 background: "#fff",
-                border:
-                  "1px solid #edf0f7",
+                border: "1px solid #edf0f7",
                 borderRadius: 14,
                 padding: 14,
-                minWidth: 0,
+                minWidth: 0
               }}
             >
-
               <div
                 style={{
                   fontSize: 12,
                   fontWeight: 700,
-                  color: "#344054",
+                  color: "#344054"
                 }}
               >
                 {card.title}
               </div>
 
-
               <div
                 style={{
-                  marginTop: 8,
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 8,
+                  marginTop: 8
                 }}
               >
-
                 <strong
                   style={{
                     fontSize: 24,
-                    color: "#17213d",
+                    color: "#17213d"
                   }}
                 >
-
-                  {
-                    card.type ===
-                    "percentage"
-
-                      ? `${card.value >= 0 ? "+" : ""}${card.value.toFixed(1)}%`
-
-                      : `+${formatCompact(
-                          card.value
-                        )}`
-
-                  }
-
+                  {card.valueType === "percentage"
+                    ? `${card.value >= 0 ? "+" : ""}${card.value.toFixed(1)}%`
+                    : `${card.value >= 0 ? "+" : ""}${formatCompact(card.value)}`}
                 </strong>
-
-
-                <GrowthBadge
-                  current={
-                    card.value
-                  }
-                  previous={
-                    card.previous
-                  }
-                />
-
               </div>
-
-
-              <div
-                style={{
-                  display: "flex",
-                  gap: 10,
-                  marginTop: 6,
-                  fontSize: 10,
-                  color: "#8b93a7",
-                }}
-              >
-
-                <span>
-                  <span
-                    style={{
-                      display:
-                        "inline-block",
-                      width: 7,
-                      height: 7,
-                      borderRadius:
-                        "50%",
-                      background:
-                        "#5368e8",
-                      marginRight: 4,
-                    }}
-                  />
-
-                  Current
-
-                </span>
-
-
-                <span>
-                  <span
-                    style={{
-                      display:
-                        "inline-block",
-                      width: 7,
-                      height: 7,
-                      borderRadius:
-                        "50%",
-                      background:
-                        "#c9cef0",
-                      marginRight: 4,
-                    }}
-                  />
-
-                  Previous
-
-                </span>
-
-              </div>
-
 
               <MetricChart
-                data={chartData}
-                currentKey={
-                  card.dataKey
-                }
-                previousKey={
-                  card.previousKey
-                }
-                valueFormat={
-                  card.type ===
-                  "percentage"
-                    ? "number"
-                    : "compact"
-                }
+                data={card.chart}
+                valueType={card.valueType}
               />
-
-
             </div>
-
-          )
-        )}
-
-      </div>
-
-
+          ))}
+        </div>
+      )}
     </section>
-
   );
-
 }
