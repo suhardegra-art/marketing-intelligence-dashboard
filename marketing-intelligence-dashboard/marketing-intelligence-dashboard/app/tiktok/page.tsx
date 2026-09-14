@@ -2,6 +2,7 @@ import Sidebar from "@/components/Sidebar";
 import SyncAllTikTokButton from "@/app/tiktok/SyncAllTikTokButton";
 import TikTokGrowthComparison from "@/components/TikTokGrowthComparison";
 import TikTokContentPerformanceTrend from "@/components/TikTokContentPerformanceTrend";
+import TikTokAIAnalysis from "@/components/TikTokAIAnalysis";
 import { getTikTokDashboardData } from "@/lib/tiktok-dashboard";
 import { getTikTokHistory } from "@/lib/tiktok-history";
 import { getTikTokGrowthData } from "@/lib/tiktok-growth";
@@ -841,6 +842,30 @@ export default async function TikTokPage({
           content={contentTrendData.content}
           anchorDate={
             contentTrendData.snapshotDate
+          }
+        />
+
+        <TikTokAIAnalysis
+          accountName={
+            contentTrendData.accountName
+          }
+          username={
+            contentTrendData.username
+          }
+          snapshotDate={
+            contentTrendData.snapshotDate
+          }
+          followers={
+            contentTrendData.followers
+          }
+          accountLikes={
+            contentTrendData.totalAccountLikes
+          }
+          content={
+            contentTrendData.content
+          }
+          growthData={
+            growthData
           }
         />
 
