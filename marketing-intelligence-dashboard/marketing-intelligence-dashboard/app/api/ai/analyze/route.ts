@@ -110,7 +110,7 @@ export async function POST(
 
     const model =
       process.env.GEMINI_MODEL ||
-      "gemini-3.7-flash";
+      "gemini-3.6-flash";
 
     const language =
       body.language || "Bahasa Indonesia";
