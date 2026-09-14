@@ -324,6 +324,7 @@ export default function TikTokGrowthComparison({
       className="panel"
       style={{
         marginTop: 16,
+        marginBottom: 16,
         padding: 16
       }}
     >
