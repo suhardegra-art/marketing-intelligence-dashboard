@@ -1,0 +1,510 @@
+
+/* =========================================================
+   YOUTUBE SIZE STANDARD — aligned to TikTok dashboard scale
+   Paste/keep this block at the END of app/youtube/youtube.css
+   ========================================================= */
+
+.yt-page-content {
+  padding: 24px 28px 36px;
+}
+
+.yt-page {
+  max-width: 1760px;
+}
+
+/* Header */
+.yt-topbar {
+  gap: 24px;
+  margin-bottom: 20px;
+}
+
+.yt-title-wrap {
+  gap: 12px;
+}
+
+.yt-youtube-badge {
+  width: 46px;
+  height: 34px;
+  border-radius: 10px;
+  font-size: 15px;
+}
+
+.yt-topbar h1 {
+  font-size: 22px;
+  letter-spacing: -.03em;
+}
+
+.yt-topbar p {
+  margin-top: 5px;
+  font-size: 12px;
+}
+
+/* Top channel banner */
+.yt-channel-banner {
+  min-height: 150px;
+  margin-bottom: 16px;
+  padding: 26px 30px;
+  border-radius: 18px;
+}
+
+.yt-channel-overline {
+  margin-bottom: 7px;
+  font-size: 10px;
+}
+
+.yt-channel-banner h2 {
+  font-size: 30px;
+}
+
+.yt-channel-meta {
+  margin-top: 8px;
+  font-size: 13px;
+}
+
+.yt-banner-pills {
+  gap: 7px;
+  margin-top: 14px;
+}
+
+.yt-banner-pills span {
+  padding: 6px 10px;
+  font-size: 10px;
+}
+
+.yt-open-channel {
+  right: 30px;
+  bottom: 24px;
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: 11px;
+}
+
+.yt-banner-play {
+  right: 86px;
+  top: 37px;
+  width: 92px;
+  height: 65px;
+  border-radius: 21px;
+  font-size: 30px;
+}
+
+.yt-banner-orb.orb-a {
+  width: 220px;
+  height: 220px;
+}
+
+.yt-banner-orb.orb-b {
+  width: 140px;
+  height: 140px;
+}
+
+/* Date filter: same visual density as TikTok */
+.yt-period-filter-card {
+  padding: 16px;
+}
+
+.yt-period-form {
+  grid-template-columns: minmax(220px, 1fr) minmax(220px, 1fr) auto auto;
+  gap: 12px;
+}
+
+.yt-period-form label {
+  gap: 6px;
+}
+
+.yt-period-form label > span {
+  font-size: 9px;
+  letter-spacing: .08em;
+}
+
+.yt-period-form input {
+  min-height: 40px;
+  border-radius: 10px;
+  padding: 0 12px;
+  font-size: 12px;
+}
+
+.yt-period-form input:focus {
+  box-shadow: 0 0 0 3px rgba(92, 115, 239, .08);
+}
+
+.yt-apply-period,
+.yt-reset-period {
+  min-height: 40px;
+  border-radius: 10px;
+  padding: 0 16px;
+  font-size: 12px;
+}
+
+.yt-period-meta {
+  margin-top: 10px;
+  font-size: 10px;
+}
+
+/* New 8-card period summary — same scale as TikTok KPI cards */
+.yt-period-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin: 16px 0;
+}
+
+.yt-period-summary-card {
+  position: relative;
+  overflow: hidden;
+  min-height: 0;
+  background: #fff;
+  border: 1px solid #e2e7ef;
+  border-radius: 14px;
+  padding: 16px;
+  box-shadow: 0 7px 18px rgba(39, 48, 92, .045);
+}
+
+.yt-period-summary-card::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 3px;
+  background: #6577ea;
+}
+
+.yt-period-summary-card p {
+  margin: 0 0 8px;
+  color: #8a92a8;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.yt-period-summary-card strong {
+  display: block;
+  color: #15203b;
+  font-size: 22px;
+  line-height: 1.08;
+  letter-spacing: -.04em;
+}
+
+/* General cards */
+.yt-card {
+  border-radius: 15px;
+  padding: 18px;
+  box-shadow: 0 7px 18px rgba(39, 48, 92, .045);
+}
+
+.yt-wide-card {
+  margin-bottom: 16px;
+}
+
+.yt-card-head {
+  margin-bottom: 18px;
+}
+
+.yt-card-head.compact {
+  margin-bottom: 14px;
+}
+
+.yt-card-head h2 {
+  font-size: 14px;
+}
+
+.yt-card-head p {
+  margin-top: 5px;
+  font-size: 10px;
+}
+
+/* YouTube Growth: match TikTok Growth */
+.yt-growth-section {
+  padding: 16px;
+}
+
+.yt-growth-head {
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.yt-growth-head h2 {
+  font-size: 18px;
+}
+
+.yt-growth-head p {
+  margin-top: 4px;
+  font-size: 12px;
+}
+
+.yt-growth-head > div:first-child > span {
+  margin-top: 5px;
+  font-size: 10px;
+}
+
+.yt-growth-range {
+  gap: 4px;
+  padding: 4px;
+  border-radius: 10px;
+}
+
+.yt-growth-range button {
+  border-radius: 7px;
+  padding: 7px 10px;
+  font-size: 11px;
+}
+
+.yt-growth-grid {
+  gap: 12px;
+}
+
+.yt-growth-card {
+  border-radius: 14px;
+  padding: 14px;
+}
+
+.yt-growth-card p {
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.yt-growth-card > strong {
+  margin-top: 8px;
+  font-size: 24px;
+}
+
+.yt-growth-chart {
+  height: 125px;
+  margin-top: 12px;
+}
+
+/* Primary performance / realtime */
+.yt-primary-grid,
+.yt-two-column-grid {
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.yt-live-performance-chart {
+  height: 285px;
+}
+
+.yt-realtime-metric strong {
+  font-size: 28px;
+}
+
+.yt-realtime-metric span {
+  font-size: 10px;
+}
+
+/* AI overview */
+.yt-ai-summary-body {
+  grid-template-columns: 130px minmax(250px, .8fr) minmax(0, 1.4fr);
+  gap: 22px;
+}
+
+.yt-score-ring {
+  width: 116px;
+  height: 116px;
+}
+
+.yt-score-ring strong {
+  font-size: 27px;
+}
+
+.yt-score-list {
+  gap: 9px;
+}
+
+.yt-score-list div,
+.yt-score-list strong {
+  font-size: 10px;
+}
+
+.yt-ai-summary-copy {
+  min-height: 116px;
+  padding-left: 22px;
+}
+
+.yt-ai-summary-copy > strong {
+  font-size: 11px;
+}
+
+.yt-ai-summary-copy p {
+  font-size: 10px;
+}
+
+.yt-ai-link {
+  min-height: 36px;
+  font-size: 9px;
+}
+
+/* Traffic / audience / content type */
+.yt-bars-list {
+  gap: 10px;
+}
+
+.yt-bars-row {
+  grid-template-columns: 120px 1fr 44px;
+  font-size: 10px;
+}
+
+.yt-content-type {
+  gap: 16px;
+}
+
+.yt-donut {
+  width: 132px;
+  height: 132px;
+}
+
+.yt-donut:after {
+  inset: 20px;
+}
+
+.yt-donut strong {
+  font-size: 21px;
+}
+
+.yt-audience-tabs {
+  margin-bottom: 12px;
+}
+
+.yt-segmented button,
+.yt-audience-tabs button {
+  min-height: 32px;
+  border-radius: 8px;
+  padding: 0 11px;
+  font-size: 9px;
+}
+
+/* Content trend */
+.yt-content-trend-card {
+  padding: 18px;
+}
+
+.yt-content-trend-top h2,
+.yt-content-table-header h2 {
+  font-size: 18px;
+}
+
+.yt-content-trend-top p,
+.yt-content-table-header p {
+  margin-top: 4px;
+  font-size: 10px;
+}
+
+.yt-range-switcher button,
+.yt-metric-tabs button {
+  min-height: 32px;
+  padding: 0 11px;
+  font-size: 10px;
+}
+
+.yt-content-trend-toolbar {
+  margin: 14px 0 5px;
+}
+
+.yt-metric-tabs {
+  gap: 6px;
+}
+
+.yt-metric-tabs button {
+  min-height: 32px;
+}
+
+.yt-trend-total strong {
+  font-size: 21px;
+}
+
+.yt-recharts-wrap {
+  height: 300px;
+}
+
+/* AI content analysis */
+.yt-content-ai-card {
+  padding: 18px;
+}
+
+.yt-content-ai-head {
+  margin-bottom: 16px;
+}
+
+.yt-content-ai-head > div:first-child > span {
+  font-size: 10px;
+}
+
+.yt-content-ai-head h2 {
+  font-size: 18px;
+}
+
+.yt-content-ai-head p {
+  font-size: 11px;
+}
+
+.yt-content-ai-kpis {
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.yt-content-ai-kpis > div {
+  border-radius: 12px;
+  padding: 12px 14px;
+}
+
+.yt-content-ai-kpis span {
+  font-size: 9px;
+}
+
+.yt-content-ai-kpis strong {
+  margin-top: 5px;
+  font-size: 20px;
+}
+
+.yt-ai-executive,
+.yt-ai-actions,
+.yt-ai-two-col article {
+  padding: 16px 18px;
+}
+
+.yt-ai-executive p,
+.yt-ai-two-col ul,
+.yt-ai-actions ol {
+  font-size: 11px;
+}
+
+/* Content table */
+.yt-content-table-card {
+  padding: 18px 18px 0;
+}
+
+.yt-csv-button {
+  min-height: 40px;
+  padding: 0 14px;
+  border-radius: 10px;
+  font-size: 12px;
+}
+
+.yt-full-content-table td {
+  padding-top: 12px;
+  padding-bottom: 12px;
+  font-size: 11px;
+}
+
+.yt-pagination-row {
+  padding: 16px 2px 18px;
+  font-size: 11px;
+}
+
+.yt-pagination-controls button {
+  width: 36px;
+  height: 36px;
+  font-size: 13px;
+}
+
+@media (max-width: 1120px) {
+  .yt-period-summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .yt-period-summary-grid {
+    grid-template-columns: 1fr;
+  }
+}
