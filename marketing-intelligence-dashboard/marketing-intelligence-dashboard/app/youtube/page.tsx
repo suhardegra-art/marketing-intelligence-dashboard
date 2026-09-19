@@ -1,3 +1,7 @@
+import YouTubeContentTrend from "./components/YouTubeContentTrend";
+import YouTubeContentTable from "./components/YouTubeContentTable";
+import { youtubePreviewContent } from "./youtubePreviewData";
+
 const trendValues = [
   2100, 2700, 2300, 1600, 2400, 1900, 2200, 2600, 1700, 1700,
   2500, 2700, 2200, 1950, 1900, 2050, 2900, 3200, 8942, 4200,
@@ -86,8 +90,25 @@ function buildLinePoints(values: number[]) {
     .join(" ");
 }
 
-export default function YouTubeOverviewPage() {
+type YouTubeOverviewProps = {
+  searchParams: Promise<{
+    from?: string;
+    to?: string;
+  }>;
+};
+
+export default async function YouTubeOverviewPage({ searchParams }: YouTubeOverviewProps) {
+  const params = await searchParams;
+  const fromDate = params.from || null;
+  const toDate = params.to || null;
   const points = buildLinePoints(trendValues);
+
+  const filteredContent = youtubePreviewContent.filter((item) => {
+    const date = item.publishedAt.slice(0, 10);
+    if (fromDate && date < fromDate) return false;
+    if (toDate && date > toDate) return false;
+    return true;
+  });
 
   return (
     <div className="yt-page-content">
@@ -139,6 +160,25 @@ export default function YouTubeOverviewPage() {
           <a className="yt-open-channel" href="https://www.youtube.com/" target="_blank" rel="noreferrer">
             Open YouTube ↗
           </a>
+        </section>
+
+        <section className="yt-card yt-period-filter-card yt-wide-card">
+          <form action="/youtube" method="get" className="yt-period-form">
+            <label>
+              <span>From Date</span>
+              <input type="date" name="from" defaultValue={fromDate ?? ""} max={toDate ?? undefined} />
+            </label>
+            <label>
+              <span>To Date</span>
+              <input type="date" name="to" defaultValue={toDate ?? ""} min={fromDate ?? undefined} />
+            </label>
+            <button type="submit" className="yt-apply-period">Apply Period</button>
+            <a href="/youtube" className="yt-reset-period">Reset</a>
+          </form>
+          <div className="yt-period-meta">
+            <span>Selected content period: <strong>{fromDate || toDate ? `${fromDate || "Beginning"} – ${toDate || "Latest"}` : "All publish dates"}</strong></span>
+            <span>Filter uses video publish date.</span>
+          </div>
         </section>
 
         <section className="yt-kpi-grid">
@@ -404,6 +444,8 @@ export default function YouTubeOverviewPage() {
           </article>
         </section>
 
+        <YouTubeContentTrend rows={filteredContent} />
+
         <section className="yt-card yt-top-content-card yt-wide-card">
           <div className="yt-card-head">
             <div>
@@ -494,6 +536,11 @@ export default function YouTubeOverviewPage() {
             </div>
           </article>
         </section>
+
+        <YouTubeContentTable
+          filteredRows={filteredContent}
+          allRows={youtubePreviewContent}
+        />
 
         <div className="yt-demo-note">
           <strong>UI PREVIEW</strong>

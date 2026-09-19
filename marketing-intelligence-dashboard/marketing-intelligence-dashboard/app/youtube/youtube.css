@@ -678,3 +678,389 @@
   .yt-latest-layout { grid-template-columns: 1fr; }
   .yt-latest-thumb { min-height: 180px; }
 }
+
+/* Added from TikTok content workflow: date filter, content trend, full content table, CSV export and pagination */
+.yt-period-filter-card {
+  padding: 20px 22px;
+}
+
+.yt-period-form {
+  display: grid;
+  grid-template-columns: minmax(240px, 1fr) minmax(240px, 1fr) auto auto;
+  gap: 14px;
+  align-items: end;
+}
+
+.yt-period-form label {
+  display: grid;
+  gap: 7px;
+}
+
+.yt-period-form label > span {
+  color: #65718a;
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+}
+
+.yt-period-form input {
+  width: 100%;
+  min-height: 48px;
+  border: 1px solid #dce3ee;
+  border-radius: 12px;
+  padding: 0 14px;
+  background: #fbfcff;
+  color: #1d2940;
+  font-size: 14px;
+  outline: none;
+}
+
+.yt-period-form input:focus {
+  border-color: #5c73ef;
+  box-shadow: 0 0 0 4px rgba(92, 115, 239, .1);
+  background: white;
+}
+
+.yt-apply-period,
+.yt-reset-period {
+  min-height: 48px;
+  border-radius: 12px;
+  padding: 0 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 900;
+  text-decoration: none;
+}
+
+.yt-apply-period {
+  border: 0;
+  background: #4b61dc;
+  color: white;
+  box-shadow: 0 8px 18px rgba(75, 97, 220, .18);
+}
+
+.yt-reset-period {
+  border: 1px solid #dce3ee;
+  background: white;
+  color: #59657e;
+}
+
+.yt-period-meta {
+  margin-top: 11px;
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  color: #8a95aa;
+  font-size: 11px;
+}
+
+.yt-period-meta strong {
+  color: #48566f;
+}
+
+.yt-content-trend-card {
+  padding: 22px 24px 16px;
+}
+
+.yt-content-trend-top,
+.yt-content-trend-toolbar,
+.yt-content-table-header,
+.yt-pagination-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  align-items: center;
+}
+
+.yt-content-trend-top h2,
+.yt-content-table-header h2 {
+  margin: 0;
+  font-size: 20px;
+  letter-spacing: -.03em;
+}
+
+.yt-content-trend-top p,
+.yt-content-table-header p {
+  margin: 5px 0 0;
+  color: #8c96aa;
+  font-size: 12px;
+}
+
+.yt-range-switcher {
+  padding: 4px;
+  display: flex;
+  gap: 3px;
+  background: #f2f4f9;
+  border: 1px solid #e6eaf1;
+  border-radius: 12px;
+}
+
+.yt-range-switcher button,
+.yt-metric-tabs button {
+  border: 0;
+  background: transparent;
+  color: #66728a;
+  border-radius: 9px;
+  min-height: 34px;
+  padding: 0 14px;
+  font-weight: 900;
+  font-size: 12px;
+}
+
+.yt-range-switcher button.active,
+.yt-metric-tabs button.active {
+  color: #4059d7;
+  background: white;
+  box-shadow: 0 3px 10px rgba(42, 56, 105, .07);
+}
+
+.yt-content-trend-toolbar {
+  margin: 16px 0 6px;
+}
+
+.yt-metric-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.yt-metric-tabs button {
+  border: 1px solid #e3e8f1;
+  background: white;
+  min-height: 36px;
+}
+
+.yt-metric-tabs button.active {
+  border-color: #d5dcff;
+  background: #eef2ff;
+}
+
+.yt-trend-total {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  white-space: nowrap;
+}
+
+.yt-trend-total span,
+.yt-trend-total em {
+  color: #8b95aa;
+  font-size: 11px;
+  font-style: normal;
+}
+
+.yt-trend-total strong {
+  color: #172033;
+  font-size: 24px;
+  letter-spacing: -.04em;
+}
+
+.yt-recharts-wrap {
+  width: 100%;
+  height: 330px;
+  margin-top: 4px;
+}
+
+.yt-content-table-card {
+  padding: 22px 24px 0;
+}
+
+.yt-csv-menu-wrap {
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.yt-csv-button {
+  min-height: 44px;
+  padding: 0 16px;
+  border-radius: 11px;
+  border: 1px solid #d7deea;
+  background: white;
+  color: #4f5c75;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.yt-csv-menu {
+  position: absolute;
+  z-index: 20;
+  right: 0;
+  top: calc(100% + 8px);
+  width: 230px;
+  padding: 8px;
+  border: 1px solid #dce3ee;
+  border-radius: 13px;
+  background: white;
+  box-shadow: 0 18px 40px rgba(31, 45, 83, .14);
+}
+
+.yt-csv-menu button {
+  width: 100%;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  text-align: left;
+  padding: 12px 13px;
+  color: #55627b;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.yt-csv-menu button:hover {
+  background: #f5f7fc;
+  color: #3049bd;
+}
+
+.yt-content-table-scroll {
+  margin-top: 18px;
+  overflow-x: auto;
+}
+
+.yt-full-content-table {
+  min-width: 1380px;
+}
+
+.yt-full-content-table th {
+  padding-top: 12px;
+  padding-bottom: 12px;
+  white-space: nowrap;
+}
+
+.yt-full-content-table th button {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: inherit;
+  font: inherit;
+  text-transform: inherit;
+  letter-spacing: inherit;
+  cursor: pointer;
+}
+
+.yt-full-content-table td {
+  padding-top: 15px;
+  padding-bottom: 15px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.yt-content-title-cell {
+  max-width: 430px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.yt-content-type-badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 5px 8px;
+  font-size: 10px;
+  font-weight: 900;
+  background: #f2f4fa;
+  color: #67748d;
+}
+
+.yt-content-type-badge.shorts {
+  background: #fff0f3;
+  color: #d82b50;
+}
+
+.yt-content-type-badge.videos {
+  background: #eef4ff;
+  color: #3d63cf;
+}
+
+.yt-full-content-table a {
+  color: #4e66dd;
+  font-weight: 900;
+  text-decoration: none;
+}
+
+.yt-empty-row {
+  padding: 34px !important;
+  text-align: center;
+  color: #8d97aa;
+}
+
+.yt-pagination-row {
+  padding: 20px 2px 22px;
+  border-top: 1px solid #edf0f5;
+  color: #7e899f;
+  font-size: 12px;
+}
+
+.yt-pagination-row > div:first-child span {
+  margin-left: 7px;
+}
+
+.yt-pagination-controls {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.yt-pagination-controls button {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 1px solid #d7deea;
+  background: white;
+  color: #44516a;
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.yt-pagination-controls button.active {
+  border-color: #4c63da;
+  background: #4c63da;
+  color: white;
+  box-shadow: 0 7px 16px rgba(76, 99, 218, .18);
+}
+
+.yt-pagination-controls button:disabled {
+  opacity: .35;
+  cursor: default;
+}
+
+@media (max-width: 980px) {
+  .yt-period-form {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .yt-content-trend-top,
+  .yt-content-trend-toolbar,
+  .yt-content-table-header,
+  .yt-pagination-row {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .yt-recharts-wrap {
+    height: 290px;
+  }
+}
+
+@media (max-width: 640px) {
+  .yt-period-form {
+    grid-template-columns: 1fr;
+  }
+
+  .yt-apply-period,
+  .yt-reset-period {
+    width: 100%;
+  }
+
+  .yt-range-switcher {
+    width: 100%;
+    overflow-x: auto;
+  }
+
+  .yt-trend-total {
+    white-space: normal;
+  }
+}
