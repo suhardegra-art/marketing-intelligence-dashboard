@@ -400,7 +400,6 @@ export default async function YouTubeOverviewPage({
                 type="date"
                 name="from"
                 defaultValue={params.from || ""}
-                max={params.to || undefined}
               />
             </label>
 
@@ -410,7 +409,6 @@ export default async function YouTubeOverviewPage({
                 type="date"
                 name="to"
                 defaultValue={params.to || ""}
-                min={params.from || undefined}
               />
             </label>
 
