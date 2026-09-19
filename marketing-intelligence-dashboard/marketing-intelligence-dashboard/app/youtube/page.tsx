@@ -262,10 +262,6 @@ export default async function YouTubeOverviewPage({
 
   const topContent = sortTopContent(content);
 
-  const latestContent = [...content].sort((a, b) =>
-    b.publishedAt.localeCompare(a.publishedAt)
-  )[0];
-
   const viewChange = changePercent(
     overview.views,
     previous.views
@@ -874,20 +870,13 @@ export default async function YouTubeOverviewPage({
                         href={item.permalink}
                         target="_blank"
                         rel="noreferrer"
-                        title={item.permalink}
                         style={{
-                          display: "inline-block",
-                          maxWidth: 230,
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                          whiteSpace: "nowrap",
                           color: "#4059d7",
-                          fontWeight: 800,
-                          textDecoration: "none",
-                          verticalAlign: "middle"
+                          fontWeight: 900,
+                          textDecoration: "none"
                         }}
                       >
-                        {item.permalink.replace(/^https?:\/\/(www\.)?/, "")}
+                        Open ↗
                       </a>
                     </td>
                   </tr>
@@ -896,36 +885,6 @@ export default async function YouTubeOverviewPage({
             </table>
           </div>
         </section>
-
-        {latestContent ? (
-          <section className="yt-card yt-latest-card yt-wide-card">
-            <div className="yt-card-head compact">
-              <div>
-                <h2>Latest Content in Selected Results</h2>
-                <p>{formatDate(latestContent.publishedAt)}</p>
-              </div>
-            </div>
-
-            <div className="yt-latest-api-row">
-              <div>
-                <h3>{latestContent.title}</h3>
-                <p>
-                  {formatCompact(latestContent.views)} views •{" "}
-                  {latestContent.avgViewDuration} avg duration •{" "}
-                  {latestContent.avgViewed.toFixed(1)}% viewed
-                </p>
-              </div>
-
-              <a
-                href={latestContent.permalink}
-                target="_blank"
-                rel="noreferrer"
-              >
-                Open video ↗
-              </a>
-            </div>
-          </section>
-        ) : null}
 
         <YouTubeContentTable
           filteredRows={content}
