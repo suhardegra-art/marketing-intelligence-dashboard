@@ -1,717 +1,484 @@
-import Sidebar from "@/components/Sidebar";
-import YouTubeGrowthComparison from "@/components/YouTubeGrowthComparison";
-import YouTubeContentAIInsights from "@/components/YouTubeContentAIInsights";
-import {
-  youtubeDemoChannel,
-  youtubeDemoSnapshots,
-  youtubeDemoVideos,
-  type YouTubeVideo
-} from "@/lib/youtube-demo-data";
+const trendValues = [
+  2100, 2700, 2300, 1600, 2400, 1900, 2200, 2600, 1700, 1700,
+  2500, 2700, 2200, 1950, 1900, 2050, 2900, 3200, 8942, 4200,
+  2700, 2100, 1800, 1750, 2500, 2750
+];
 
-export const dynamic = "force-dynamic";
+const trafficSources = [
+  ["YouTube search", 43.0],
+  ["Shorts feed", 34.3],
+  ["Browse features", 10.5],
+  ["Suggested videos", 6.8],
+  ["Channel pages", 2.8],
+  ["External", 2.5],
+  ["Others", 0.1]
+] as const;
 
-type Props = {
-  searchParams: Promise<{
-    from?: string;
-    to?: string;
-  }>;
-};
+const ages = [
+  ["13–17 years", 0.3],
+  ["18–24 years", 3.9],
+  ["25–34 years", 34.1],
+  ["35–44 years", 38.3],
+  ["45–54 years", 18.3],
+  ["55–64 years", 4.5],
+  ["65+ years", 0.6]
+] as const;
 
-function formatNumber(value: number) {
-  return new Intl.NumberFormat("en-US").format(value);
-}
-
-function formatCompact(value: number) {
-  return new Intl.NumberFormat("en-US", {
-    notation: "compact",
-    maximumFractionDigits: 1
-  }).format(value);
-}
-
-function formatDate(value: string | null) {
-  if (!value) return "—";
-
-  return new Intl.DateTimeFormat("en-GB", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric"
-  }).format(new Date(value));
-}
-
-function contentEr(item: YouTubeVideo) {
-  if (!item.views) return 0;
-
-  return (
-    ((item.likes + item.comments + item.shares) /
-      item.views) *
-    100
-  );
-}
-
-function periodLabel(from: string | null, to: string | null) {
-  if (from && to) {
-    return `${formatDate(from)} – ${formatDate(to)}`;
+const topContent = [
+  {
+    title: "Punya cewe yang nggak ngerti motor listrik tuh emang menguji kesabaran...",
+    date: "Sep 11, 2026",
+    views: "8,302",
+    duration: "0:21",
+    viewed: "75.6%",
+    likes: "612",
+    comments: "48"
+  },
+  {
+    title: "POV 6 Bulan Pakai Motor Listrik Adora",
+    date: "Sep 23, 2025",
+    views: "7,713",
+    duration: "0:26",
+    viewed: "66.3%",
+    likes: "548",
+    comments: "32"
+  },
+  {
+    title: "Day 1 Nge Charge Motor Listrik Tyranno",
+    date: "Oct 17, 2025",
+    views: "7,636",
+    duration: "0:24",
+    viewed: "102.0%",
+    likes: "490",
+    comments: "41"
+  },
+  {
+    title: "Motor Listrik Adora, Lebih Murah?",
+    date: "May 20, 2025",
+    views: "7,535",
+    duration: "0:26",
+    viewed: "81.4%",
+    likes: "467",
+    comments: "28"
+  },
+  {
+    title: "baru 2 menit ga bales, udah ditanya 'dimana' 😭",
+    date: "Sep 13, 2026",
+    views: "2,817",
+    duration: "0:09",
+    viewed: "164.3%",
+    likes: "301",
+    comments: "22"
   }
+];
 
-  if (from) return `From ${formatDate(from)}`;
-  if (to) return `Until ${formatDate(to)}`;
+function buildLinePoints(values: number[]) {
+  const max = Math.max(...values);
+  const min = 0;
+  const width = 900;
+  const height = 210;
 
-  return "All publish dates";
+  return values
+    .map((value, index) => {
+      const x = (index / (values.length - 1)) * width;
+      const y = height - ((value - min) / (max - min)) * 175 - 15;
+      return `${x.toFixed(1)},${y.toFixed(1)}`;
+    })
+    .join(" ");
 }
 
-export default async function YouTubePage({
-  searchParams
-}: Props) {
-  const params = await searchParams;
-  const fromDate = params.from || null;
-  const toDate = params.to || null;
-
-  const content = youtubeDemoVideos.filter((item) => {
-    const date = item.publishedAt.slice(0, 10);
-
-    if (fromDate && date < fromDate) return false;
-    if (toDate && date > toDate) return false;
-
-    return true;
-  });
-
-  const totalViews = content.reduce(
-    (sum, item) => sum + item.views,
-    0
-  );
-  const totalLikes = content.reduce(
-    (sum, item) => sum + item.likes,
-    0
-  );
-  const totalComments = content.reduce(
-    (sum, item) => sum + item.comments,
-    0
-  );
-  const totalShares = content.reduce(
-    (sum, item) => sum + item.shares,
-    0
-  );
-  const totalInteractions =
-    totalLikes + totalComments + totalShares;
-
-  const avgViews =
-    content.length > 0
-      ? Math.round(totalViews / content.length)
-      : 0;
-
-  const engagementRate = totalViews
-    ? (totalInteractions / totalViews) * 100
-    : 0;
-
-  const topContent = [...content]
-    .sort((a, b) => b.views - a.views)
-    .slice(0, 5);
-
-  const engagementRows = [
-    ["Likes", totalLikes],
-    ["Comments", totalComments],
-    ["Shares", totalShares],
-    ["Interactions", totalInteractions]
-  ] as const;
-
-  const maxEngagement = Math.max(
-    ...engagementRows.map(([, value]) => value),
-    1
-  );
+export default function YouTubeOverviewPage() {
+  const points = buildLinePoints(trendValues);
 
   return (
-    <div className="app-shell">
-      <Sidebar activeItem="YouTube" />
-
-      <main className="main-content">
-        <header className="topbar">
+    <div className="yt-page">
+      <header className="yt-topbar">
+        <div className="yt-title-wrap">
+          <div className="yt-youtube-badge">▶</div>
           <div>
-            <h1>YouTube Performance</h1>
-            <p>Channel and content performance from YouTube</p>
-          </div>
-
-          <div className="topbar-actions">
-            <div className="period-select">
-              <span>STATUS</span>
-              <strong>Demo Data</strong>
-            </div>
-
-            <div className="avatar">YT</div>
-
-            <form action="/api/logout" method="post">
-              <button className="logout-button">Logout</button>
-            </form>
-          </div>
-        </header>
-
-        <section
-          style={{
-            borderRadius: 18,
-            padding: "26px 30px",
-            marginBottom: 16,
-            background:
-              "linear-gradient(120deg,#101010 0%,#171314 58%,#44191c 100%)",
-            color: "#fff",
-            display: "flex",
-            justifyContent: "space-between",
-            gap: 24,
-            alignItems: "center",
-            flexWrap: "wrap",
-            boxShadow: "0 12px 30px rgba(20,20,40,.12)"
-          }}
-        >
-          <div>
-            <div
-              style={{
-                display: "flex",
-                gap: 8,
-                alignItems: "center",
-                flexWrap: "wrap",
-                marginBottom: 8
-              }}
-            >
-              <p
-                style={{
-                  margin: 0,
-                  fontSize: 10,
-                  fontWeight: 900,
-                  letterSpacing: ".14em",
-                  color: "#ff8b8b"
-                }}
-              >
-                YOUTUBE CHANNEL
-              </p>
-
-              <span
-                style={{
-                  borderRadius: 999,
-                  padding: "4px 8px",
-                  background: "rgba(255,255,255,.11)",
-                  border: "1px solid rgba(255,255,255,.2)",
-                  color: "rgba(255,255,255,.82)",
-                  fontSize: 8,
-                  fontWeight: 900
-                }}
-              >
-                DEMO DATA
-              </span>
-            </div>
-
-            <h2
-              style={{
-                margin: 0,
-                fontSize: 30
-              }}
-            >
-              {youtubeDemoChannel.channelName}
-            </h2>
-
-            <p
-              style={{
-                margin: "8px 0 0",
-                color: "rgba(255,255,255,.68)",
-                fontSize: 13
-              }}
-            >
-              {youtubeDemoChannel.handle} •{" "}
-              {formatCompact(youtubeDemoChannel.subscribers)} subscribers
+            <h1>YouTube Analytics</h1>
+            <p>
+              Track performance, understand your audience, and grow your channel
+              with data-driven insights.
             </p>
           </div>
+        </div>
 
-          <a
-            href={youtubeDemoChannel.channelUrl}
-            target="_blank"
-            rel="noreferrer"
-            style={{
-              color: "#fff",
-              textDecoration: "none",
-              border: "1px solid rgba(255,255,255,.22)",
-              padding: "10px 14px",
-              borderRadius: 10,
-              fontWeight: 800,
-              fontSize: 12
-            }}
-          >
-            Open YouTube ↗
+        <div className="yt-top-actions">
+          <button className="yt-date-button">
+            <span>Aug 22, 2026 – Sep 18, 2026</span>
+            <small>Last 28 days</small>
+          </button>
+          <button className="yt-soft-button">Compare</button>
+          <button className="yt-soft-button">Export</button>
+          <button className="yt-icon-button">•••</button>
+        </div>
+      </header>
+
+      <section className="yt-kpi-grid">
+        <article className="yt-kpi-card">
+          <span className="yt-kpi-icon">◉</span>
+          <div>
+            <p>Views</p>
+            <strong>78.2K</strong>
+            <small className="yt-positive">↑ 12%</small>
+            <em>About the same as usual</em>
+          </div>
+        </article>
+
+        <article className="yt-kpi-card">
+          <span className="yt-kpi-icon">◷</span>
+          <div>
+            <p>Watch time (hours)</p>
+            <strong>287.3</strong>
+            <small className="yt-negative">↓ 1%</small>
+            <em>2.7 less than previous 28 days</em>
+          </div>
+        </article>
+
+        <article className="yt-kpi-card">
+          <span className="yt-kpi-icon">◎</span>
+          <div>
+            <p>Subscribers</p>
+            <strong>+49</strong>
+            <small className="yt-negative">↓ 27%</small>
+            <em>18 less than previous 28 days</em>
+          </div>
+        </article>
+
+        <article className="yt-kpi-card">
+          <span className="yt-kpi-icon">♡</span>
+          <div>
+            <p>Engagement rate</p>
+            <strong>5.3%</strong>
+            <small className="yt-positive">↑ 18%</small>
+            <em>Higher than previous 28 days</em>
+          </div>
+        </article>
+      </section>
+
+      <section className="yt-overview-grid">
+        <article className="yt-card yt-trend-card">
+          <div className="yt-card-head">
+            <div>
+              <h2>Performance Trend</h2>
+              <p>Daily channel performance for the selected period</p>
+            </div>
+            <div className="yt-segmented">
+              <button className="active">Views</button>
+              <button>Watch time</button>
+              <button>Subscribers</button>
+            </div>
+          </div>
+
+          <div className="yt-chart-wrap">
+            <div className="yt-grid-lines">
+              <span>9K</span>
+              <span>6K</span>
+              <span>3K</span>
+              <span>0</span>
+            </div>
+            <svg
+              className="yt-line-chart"
+              viewBox="0 0 900 230"
+              preserveAspectRatio="none"
+              role="img"
+              aria-label="Views trend"
+            >
+              <defs>
+                <linearGradient id="ytFill" x1="0" x2="0" y1="0" y2="1">
+                  <stop offset="0%" stopColor="#1677ff" stopOpacity="0.22" />
+                  <stop offset="100%" stopColor="#1677ff" stopOpacity="0.02" />
+                </linearGradient>
+              </defs>
+              <polygon
+                points={`0,220 ${points} 900,220`}
+                fill="url(#ytFill)"
+              />
+              <polyline
+                points={points}
+                fill="none"
+                stroke="#1677ff"
+                strokeWidth="4"
+                strokeLinejoin="round"
+                strokeLinecap="round"
+              />
+              <circle cx="648" cy="48" r="6" fill="#1677ff" />
+            </svg>
+            <div className="yt-chart-tooltip">
+              <span>Sep 11, 2026</span>
+              <strong>8,942 views</strong>
+            </div>
+            <div className="yt-chart-dates">
+              <span>Aug 22</span>
+              <span>Aug 27</span>
+              <span>Sep 1</span>
+              <span>Sep 6</span>
+              <span>Sep 11</span>
+              <span>Sep 14</span>
+              <span>Sep 18</span>
+            </div>
+          </div>
+        </article>
+
+        <article className="yt-card yt-realtime-card">
+          <div className="yt-card-head compact">
+            <div>
+              <h2>Realtime</h2>
+              <p><span className="yt-live-dot" /> Estimated monitor</p>
+            </div>
+          </div>
+          <div className="yt-realtime-metric">
+            <strong>3,824</strong>
+            <span>Views · Last 48 hours</span>
+            <div className="yt-mini-bars big">
+              {Array.from({ length: 36 }).map((_, index) => (
+                <i
+                  key={index}
+                  style={{ height: `${18 + ((index * 13) % 42)}px` }}
+                />
+              ))}
+            </div>
+          </div>
+          <div className="yt-realtime-metric second">
+            <strong>119</strong>
+            <span>Views · Last 60 minutes</span>
+            <div className="yt-mini-bars">
+              {Array.from({ length: 30 }).map((_, index) => (
+                <i
+                  key={index}
+                  style={{ height: `${6 + ((index * 7) % 24)}px` }}
+                />
+              ))}
+            </div>
+          </div>
+        </article>
+
+        <article className="yt-card yt-ai-summary-card">
+          <div className="yt-card-head compact">
+            <div>
+              <h2>✦ AI Performance Summary</h2>
+              <p>Generated from channel performance data</p>
+            </div>
+            <span className="yt-beta">Beta</span>
+          </div>
+
+          <div className="yt-ai-summary-body">
+            <div className="yt-score-ring">
+              <div>
+                <strong>82</strong>
+                <span>/100</span>
+                <small>Overall Score</small>
+              </div>
+            </div>
+
+            <div className="yt-score-list">
+              <div><span>Growth</span><strong className="good">● Strong</strong></div>
+              <div><span>Content Efficiency</span><strong className="good">● Good</strong></div>
+              <div><span>Audience Retention</span><strong className="warn">● Needs Attention</strong></div>
+              <div><span>Discovery</span><strong className="good">● Improving</strong></div>
+              <div><span>Subscriber Conversion</span><strong className="warn">● Moderate</strong></div>
+            </div>
+          </div>
+
+          <p className="yt-ai-copy">
+            Channel mencatat pertumbuhan views yang stabil. Shorts menjadi
+            kontributor terbesar terhadap reach, sementara video long-form
+            menghasilkan watch time yang lebih tinggi. Pertumbuhan subscriber
+            positif, namun conversion masih dapat ditingkatkan.
+          </p>
+
+          <a className="yt-ai-link" href="/youtube/ai-performance">
+            Lihat analisa detail AI <span>→</span>
           </a>
-        </section>
+        </article>
+      </section>
 
-        <section
-          className="panel"
-          style={{
-            marginBottom: 16,
-            padding: 16
-          }}
-        >
-          <form
-            action="/youtube"
-            method="get"
-            style={{
-              display: "grid",
-              gridTemplateColumns: "1fr 1fr auto auto",
-              gap: 12,
-              alignItems: "end"
-            }}
-          >
-            <label style={{ display: "grid", gap: 6 }}>
-              <span
-                style={{
-                  color: "#7a839d",
-                  fontSize: 9,
-                  fontWeight: 800,
-                  textTransform: "uppercase",
-                  letterSpacing: ".08em"
-                }}
-              >
-                From Date
-              </span>
-
-              <input
-                type="date"
-                name="from"
-                defaultValue={fromDate ?? ""}
-                max={toDate ?? undefined}
-                style={{
-                  minHeight: 40,
-                  border: "1px solid #dce1ef",
-                  borderRadius: 10,
-                  padding: "0 12px",
-                  background: "#fbfcff",
-                  color: "#141b34"
-                }}
-              />
-            </label>
-
-            <label style={{ display: "grid", gap: 6 }}>
-              <span
-                style={{
-                  color: "#7a839d",
-                  fontSize: 9,
-                  fontWeight: 800,
-                  textTransform: "uppercase",
-                  letterSpacing: ".08em"
-                }}
-              >
-                To Date
-              </span>
-
-              <input
-                type="date"
-                name="to"
-                defaultValue={toDate ?? ""}
-                min={fromDate ?? undefined}
-                style={{
-                  minHeight: 40,
-                  border: "1px solid #dce1ef",
-                  borderRadius: 10,
-                  padding: "0 12px",
-                  background: "#fbfcff",
-                  color: "#141b34"
-                }}
-              />
-            </label>
-
-            <button
-              type="submit"
-              style={{
-                minHeight: 40,
-                border: 0,
-                borderRadius: 10,
-                padding: "0 18px",
-                background: "#4059d7",
-                color: "#fff",
-                fontWeight: 800,
-                fontSize: 12
-              }}
-            >
-              Apply Period
-            </button>
-
-            <a
-              href="/youtube"
-              style={{
-                minHeight: 40,
-                display: "inline-flex",
-                alignItems: "center",
-                justifyContent: "center",
-                border: "1px solid #dce1ef",
-                borderRadius: 10,
-                padding: "0 16px",
-                background: "#fff",
-                color: "#59617a",
-                fontWeight: 800,
-                fontSize: 12,
-                textDecoration: "none"
-              }}
-            >
-              Reset
-            </a>
-          </form>
-
-          <div
-            style={{
-              marginTop: 10,
-              display: "flex",
-              justifyContent: "space-between",
-              gap: 12,
-              flexWrap: "wrap"
-            }}
-          >
-            <span
-              style={{
-                color: "#59617a",
-                fontSize: 10
-              }}
-            >
-              Selected content period:{" "}
-              <strong>{periodLabel(fromDate, toDate)}</strong>
-            </span>
-
-            <span
-              style={{
-                color: "#b54708",
-                fontSize: 9,
-                fontWeight: 800
-              }}
-            >
-              Prototype • filter uses video publish date
-            </span>
+      <section className="yt-middle-grid">
+        <article className="yt-card">
+          <div className="yt-card-head compact">
+            <div>
+              <h2>How viewers find your videos</h2>
+              <p>Views · Last 28 days</p>
+            </div>
           </div>
-        </section>
+          <div className="yt-bars-list">
+            {trafficSources.map(([label, value]) => (
+              <div className="yt-bars-row" key={label}>
+                <span>{label}</span>
+                <div><i style={{ width: `${Math.min(100, value * 2)}%` }} /></div>
+                <strong>{value.toFixed(1)}%</strong>
+              </div>
+            ))}
+          </div>
+        </article>
 
-        <section
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(4,minmax(0,1fr))",
-            gap: 12,
-            marginBottom: 16
-          }}
-        >
-          {[
-            ["Subscribers (Current)", formatCompact(youtubeDemoChannel.subscribers)],
-            ["Videos in Period", formatNumber(content.length)],
-            ["Views in Period", formatCompact(totalViews)],
-            ["Avg. Views / Video", formatCompact(avgViews)],
-            ["Likes in Period", formatCompact(totalLikes)],
-            ["Comments in Period", formatCompact(totalComments)],
-            ["Shares in Period", formatCompact(totalShares)],
-            ["Engagement Rate", `${engagementRate.toFixed(2)}%`]
-          ].map(([label, value]) => (
-            <article className="kpi-card" key={label}>
-              <p>{label}</p>
-              <strong>{value}</strong>
-            </article>
-          ))}
-        </section>
-
-        <YouTubeGrowthComparison
-          snapshots={youtubeDemoSnapshots}
-          anchorDate={youtubeDemoChannel.snapshotDate}
-        />
-
-        <YouTubeContentAIInsights
-          channelName={youtubeDemoChannel.channelName}
-          handle={youtubeDemoChannel.handle}
-          snapshotDate={youtubeDemoChannel.snapshotDate}
-          subscribers={youtubeDemoChannel.subscribers}
-          content={youtubeDemoVideos}
-          snapshots={youtubeDemoSnapshots}
-        />
-
-        <section className="two-column">
-          <article className="panel">
-            <div className="panel-header">
+        <article className="yt-card">
+          <div className="yt-card-head compact">
+            <div>
+              <h2>Views by content type</h2>
+              <p>Views · Last 28 days</p>
+            </div>
+          </div>
+          <div className="yt-content-type">
+            <div className="yt-donut">
               <div>
-                <h3>Content Engagement</h3>
-                <p>Videos published in the selected date range</p>
+                <strong>78.2K</strong>
+                <span>Total Views</span>
               </div>
             </div>
-
-            <div className="bar-chart">
-              {engagementRows.map(([label, value]) => (
-                <div className="bar-row" key={label}>
-                  <span className="bar-label">{label}</span>
-                  <div className="bar-track">
-                    <div
-                      className="bar-fill"
-                      style={{
-                        width: `${Math.max(
-                          4,
-                          (value / maxEngagement) * 100
-                        )}%`
-                      }}
-                    />
-                  </div>
-                  <strong>{formatCompact(value)}</strong>
-                </div>
-              ))}
+            <div className="yt-legend">
+              <div><span className="c1" />Shorts <strong>86.2%</strong></div>
+              <div><span className="c2" />Videos <strong>13.1%</strong></div>
+              <div><span className="c3" />Live <strong>0.7%</strong></div>
             </div>
-          </article>
+          </div>
+        </article>
 
-          <article className="panel">
-            <div className="panel-header">
-              <div>
-                <h3>YouTube Analytics Expansion</h3>
-                <p>
-                  Private channel metrics available after OAuth
-                </p>
+        <article className="yt-card">
+          <div className="yt-card-head compact">
+            <div>
+              <h2>Audience</h2>
+              <p>Last 28 days</p>
+            </div>
+          </div>
+          <div className="yt-audience-tabs">
+            <button className="active">Age</button>
+            <button>Gender</button>
+            <button>Device</button>
+            <button>Top geographies</button>
+          </div>
+          <div className="yt-bars-list audience">
+            {ages.map(([label, value]) => (
+              <div className="yt-bars-row" key={label}>
+                <span>{label}</span>
+                <div><i style={{ width: `${value * 2.2}%` }} /></div>
+                <strong>{value.toFixed(1)}%</strong>
               </div>
-            </div>
+            ))}
+          </div>
+        </article>
 
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(2,minmax(0,1fr))",
-                gap: 10
-              }}
-            >
-              {[
-                "Watch Time",
-                "Avg. View Duration",
-                "Subscribers Gained",
-                "Subscribers Lost"
-              ].map((metric) => (
-                <div
-                  key={metric}
-                  style={{
-                    border: "1px solid #e8ebf3",
-                    borderRadius: 12,
-                    padding: 13,
-                    background: "#fbfcff"
-                  }}
-                >
-                  <span
-                    style={{
-                      display: "block",
-                      color: "#7a839d",
-                      fontSize: 9,
-                      marginBottom: 5
-                    }}
-                  >
-                    {metric}
-                  </span>
-                  <strong
-                    style={{
-                      color: "#b54708",
-                      fontSize: 12
-                    }}
-                  >
-                    API Pending
-                  </strong>
-                </div>
-              ))}
-            </div>
-          </article>
-        </section>
-
-        <section
-          className="panel"
-          style={{ marginBottom: 16 }}
-        >
-          <div className="panel-header">
+        <article className="yt-card yt-ai-highlights-card">
+          <div className="yt-card-head compact">
             <div>
-              <h3>Top Content by Views</h3>
-              <p>Top 5 videos published in the selected period</p>
+              <h2>◎ AI Insights Highlight</h2>
+              <p>Prioritized opportunities from channel signals</p>
+            </div>
+            <a href="/youtube/ai-performance">See all</a>
+          </div>
+          <div className="yt-insight-list">
+            <div>
+              <span className="green">↗</span>
+              <p><strong>Views meningkat 28%</strong><small>Traffic dari YouTube Search naik dibanding periode sebelumnya.</small></p>
+            </div>
+            <div>
+              <span className="yellow">!</span>
+              <p><strong>Retention drop di detik 6–10</strong><small>Perkuat hook pembuka dan percepat masuk ke inti konten.</small></p>
+            </div>
+            <div>
+              <span className="blue">▥</span>
+              <p><strong>Shorts sangat efektif untuk reach</strong><small>Gunakan Shorts untuk acquisition dan arahkan ke long-form.</small></p>
+            </div>
+          </div>
+        </article>
+      </section>
+
+      <section className="yt-bottom-grid">
+        <article className="yt-card yt-top-content-card">
+          <div className="yt-card-head compact">
+            <div>
+              <h2>Top Content</h2>
+              <p>Best-performing content in the selected period</p>
+            </div>
+            <div className="yt-segmented mini">
+              <button className="active">All</button>
+              <button>Videos</button>
+              <button>Shorts</button>
+              <button>Live</button>
             </div>
           </div>
 
-          {topContent.length === 0 ? (
-            <p
-              style={{
-                color: "#8a92a8",
-                fontSize: 11
-              }}
-            >
-              No demo videos were found for this publish-date range.
-            </p>
-          ) : (
-            <div
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                gap: 12
-              }}
-            >
-              {topContent.map((item, index) => (
-                <div
-                  key={item.id}
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "28px 1fr auto",
-                    gap: 10,
-                    alignItems: "center",
-                    borderBottom: "1px solid #eef0f6",
-                    paddingBottom: 10
-                  }}
-                >
-                  <strong style={{ color: "#69718a" }}>
-                    {String(index + 1).padStart(2, "0")}
-                  </strong>
-
-                  <div style={{ minWidth: 0 }}>
-                    <div
-                      style={{
-                        fontWeight: 800,
-                        fontSize: 12,
-                        whiteSpace: "nowrap",
-                        overflow: "hidden",
-                        textOverflow: "ellipsis"
-                      }}
-                    >
-                      {item.title}
-                    </div>
-
-                    <div
-                      style={{
-                        color: "#8a92a8",
-                        fontSize: 10,
-                        marginTop: 3
-                      }}
-                    >
-                      {formatDate(item.publishedAt)} • ER{" "}
-                      {contentEr(item).toFixed(2)}%
-                    </div>
-                  </div>
-
-                  <strong>{formatCompact(item.views)}</strong>
-                </div>
-              ))}
-            </div>
-          )}
-        </section>
-
-        <section className="panel table-panel">
-          <div className="panel-header">
-            <div>
-              <h3>YouTube Content</h3>
-              <p>
-                {content.length} videos in selected period •{" "}
-                {youtubeDemoVideos.length} demo videos stored
-              </p>
-            </div>
-
-            <span
-              style={{
-                borderRadius: 999,
-                padding: "6px 9px",
-                background: "#fff7ed",
-                color: "#b54708",
-                fontSize: 8,
-                fontWeight: 900
-              }}
-            >
-              DEMO DATA
-            </span>
-          </div>
-
-          <div className="table-wrap">
-            <table>
+          <div className="yt-table-wrap">
+            <table className="yt-table">
               <thead>
                 <tr>
-                  <th>Date</th>
+                  <th>#</th>
                   <th>Content</th>
+                  <th>Publish date</th>
                   <th>Views</th>
+                  <th>Avg view duration</th>
+                  <th>Avg % viewed</th>
                   <th>Likes</th>
                   <th>Comments</th>
-                  <th>Shares</th>
-                  <th>ER</th>
-                  <th>Link</th>
                 </tr>
               </thead>
-
               <tbody>
-                {content.length === 0 ? (
-                  <tr>
-                    <td
-                      colSpan={8}
-                      style={{
-                        textAlign: "center",
-                        color: "#9aa2b7",
-                        padding: "28px 12px"
-                      }}
-                    >
-                      No demo videos match this publish-date range.
+                {topContent.map((item, index) => (
+                  <tr key={item.title}>
+                    <td>{index + 1}</td>
+                    <td>
+                      <div className="yt-content-cell">
+                        <span className={`yt-thumb t${index + 1}`} />
+                        <span>{item.title}</span>
+                      </div>
                     </td>
+                    <td>{item.date}</td>
+                    <td><strong>{item.views}</strong></td>
+                    <td>{item.duration}</td>
+                    <td>{item.viewed}</td>
+                    <td>{item.likes}</td>
+                    <td>{item.comments}</td>
                   </tr>
-                ) : (
-                  content.map((item) => (
-                    <tr key={item.id}>
-                      <td>{formatDate(item.publishedAt)}</td>
-                      <td style={{ maxWidth: 360 }}>
-                        <div
-                          style={{
-                            overflow: "hidden",
-                            whiteSpace: "nowrap",
-                            textOverflow: "ellipsis"
-                          }}
-                        >
-                          {item.title}
-                        </div>
-                      </td>
-                      <td>{formatNumber(item.views)}</td>
-                      <td>{formatNumber(item.likes)}</td>
-                      <td>{formatNumber(item.comments)}</td>
-                      <td>{formatNumber(item.shares)}</td>
-                      <td>{contentEr(item).toFixed(2)}%</td>
-                      <td>
-                        <a
-                          href={item.permalink}
-                          target="_blank"
-                          rel="noreferrer"
-                          style={{
-                            color: "#5364d8",
-                            fontWeight: 800,
-                            textDecoration: "none"
-                          }}
-                        >
-                          Open ↗
-                        </a>
-                      </td>
-                    </tr>
-                  ))
-                )}
+                ))}
               </tbody>
             </table>
           </div>
-        </section>
+        </article>
 
-        <section
-          className="panel"
-          style={{
-            marginBottom: 16,
-            background: "#fffaf0",
-            borderStyle: "dashed"
-          }}
-        >
-          <strong
-            style={{
-              display: "block",
-              marginBottom: 6
-            }}
-          >
-            Prototype note
-          </strong>
+        <article className="yt-card yt-latest-card">
+          <div className="yt-card-head compact">
+            <div>
+              <h2>Latest Content</h2>
+              <p>Most recent upload</p>
+            </div>
+          </div>
+          <div className="yt-latest-thumb"><span>0:26</span></div>
+          <h3>baru 2 menit ga bales, udah ditanya “dimana”...</h3>
+          <p>Sep 13, 2026 · 2.8K views</p>
+          <div className="yt-latest-stats">
+            <div><span>Views</span><strong>2.8K</strong></div>
+            <div><span>Average % viewed</span><strong>164.3%</strong></div>
+            <div><span>Likes</span><strong>301</strong></div>
+            <div><span>Comments</span><strong>22</strong></div>
+          </div>
+          <a href="/youtube/content" className="yt-ai-link">Lihat analisa video <span>→</span></a>
+        </article>
 
-          <p
-            style={{
-              margin: 0,
-              color: "#7a839d",
-              fontSize: 10,
-              lineHeight: 1.6
-            }}
-          >
-            This page intentionally uses demo data so the layout can
-            be reviewed before YouTube OAuth and API synchronization
-            are connected. Content Performance Trend groups current
-            video metrics by publish date; it does not claim the views
-            were earned on each historical day.
-          </p>
-        </section>
+        <article className="yt-card yt-next-ideas-card">
+          <div className="yt-card-head compact">
+            <div>
+              <h2>Next Content Ideas <small>(AI Recommendation)</small></h2>
+              <p>Ideas generated from winning content patterns</p>
+            </div>
+            <a href="/youtube/ai-performance">See all</a>
+          </div>
+          <div className="yt-next-list">
+            <div><span>1</span><p><strong>Berapa biaya motor listrik selama 1 bulan?</strong><small>Topik biaya memiliki retention 1.6× lebih tinggi.</small></p><b>›</b></div>
+            <div><span>2</span><p><strong>POV commuting Jakarta pakai Tyranno</strong><small>Format POV menghasilkan subscriber conversion tertinggi.</small></p><b>›</b></div>
+            <div><span>3</span><p><strong>Motor listrik kuat nanjak?</strong><small>Peluang tinggi di YouTube Search; volume pencarian meningkat.</small></p><b>›</b></div>
+          </div>
+        </article>
+      </section>
 
-        <footer>
-          YouTube Performance • Demo Dashboard Prototype
-        </footer>
-      </main>
+      <div className="yt-demo-note">
+        <strong>UI PREVIEW</strong>
+        <span>
+          Angka pada halaman ini masih placeholder berdasarkan screenshot YouTube Studio.
+          Setelah UI disetujui, data akan diganti dengan YouTube Data API, YouTube Analytics API,
+          YouTube Reporting API, dan snapshot Supabase.
+        </span>
+      </div>
     </div>
   );
 }
