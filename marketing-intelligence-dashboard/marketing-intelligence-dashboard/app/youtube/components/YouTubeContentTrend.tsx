@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   CartesianGrid,
   Line,
@@ -16,7 +16,7 @@ import {
 } from "../youtubePreviewData";
 
 type Metric = "views" | "likes" | "comments" | "shares" | "er";
-type RangeKey = "7D" | "1M" | "3M" | "6M" | "1Y";
+export type RangeKey = "7D" | "1M" | "3M" | "6M" | "1Y";
 
 const metricLabels: Record<Metric, string> = {
   views: "Views",
@@ -26,13 +26,15 @@ const metricLabels: Record<Metric, string> = {
   er: "ER"
 };
 
-const rangeDays: Record<RangeKey, number> = {
+export const youtubeContentRangeDays: Record<RangeKey, number> = {
   "7D": 7,
   "1M": 30,
   "3M": 90,
   "6M": 180,
   "1Y": 365
 };
+
+export const YOUTUBE_CONTENT_RANGE_EVENT = "youtube-content-range-change";
 
 function formatCompact(value: number) {
   return new Intl.NumberFormat("en-US", {
@@ -48,6 +50,42 @@ function formatAxisDate(value: string) {
   }).format(new Date(`${value}T00:00:00Z`));
 }
 
+export function getRowsForYouTubeContentRange(
+  rows: YouTubePreviewContent[],
+  range: RangeKey
+) {
+  if (rows.length === 0) {
+    return {
+      rows: [] as YouTubePreviewContent[],
+      fromDate: "",
+      toDate: ""
+    };
+  }
+
+  const latest = [...rows]
+    .map((row) => row.publishedAt.slice(0, 10))
+    .filter(Boolean)
+    .sort()
+    .at(-1)!;
+
+  const latestDate = new Date(`${latest}T00:00:00Z`);
+  const startDate = new Date(latestDate);
+  startDate.setUTCDate(
+    startDate.getUTCDate() - (youtubeContentRangeDays[range] - 1)
+  );
+
+  const start = startDate.toISOString().slice(0, 10);
+
+  return {
+    rows: rows.filter((row) => {
+      const date = row.publishedAt.slice(0, 10);
+      return date >= start && date <= latest;
+    }),
+    fromDate: start,
+    toDate: latest
+  };
+}
+
 export default function YouTubeContentTrend({
   rows
 }: {
@@ -56,51 +94,54 @@ export default function YouTubeContentTrend({
   const [metric, setMetric] = useState<Metric>("views");
   const [range, setRange] = useState<RangeKey>("7D");
 
+  // Keep AI Content Performance Analysis synchronized with this range.
+  useEffect(() => {
+    window.dispatchEvent(
+      new CustomEvent(YOUTUBE_CONTENT_RANGE_EVENT, {
+        detail: { range }
+      })
+    );
+  }, [range]);
+
+  const rangeResult = useMemo(
+    () => getRowsForYouTubeContentRange(rows, range),
+    [rows, range]
+  );
+
   const data = useMemo(() => {
-    if (rows.length === 0) return [];
+    const byDate = new Map<
+      string,
+      {
+        date: string;
+        views: number;
+        likes: number;
+        comments: number;
+        shares: number;
+        erWeighted: number;
+        videos: number;
+      }
+    >();
 
-    const latest = [...rows]
-      .map((row) => row.publishedAt.slice(0, 10))
-      .sort()
-      .at(-1)!;
+    rangeResult.rows.forEach((row) => {
+      const date = row.publishedAt.slice(0, 10);
+      const current = byDate.get(date) ?? {
+        date,
+        views: 0,
+        likes: 0,
+        comments: 0,
+        shares: 0,
+        erWeighted: 0,
+        videos: 0
+      };
 
-    const latestDate = new Date(`${latest}T00:00:00Z`);
-    const startDate = new Date(latestDate);
-    startDate.setUTCDate(startDate.getUTCDate() - (rangeDays[range] - 1));
-    const start = startDate.toISOString().slice(0, 10);
-
-    const byDate = new Map<string, {
-      date: string;
-      views: number;
-      likes: number;
-      comments: number;
-      shares: number;
-      erWeighted: number;
-      videos: number;
-    }>();
-
-    rows
-      .filter((row) => row.publishedAt.slice(0, 10) >= start)
-      .forEach((row) => {
-        const date = row.publishedAt.slice(0, 10);
-        const current = byDate.get(date) ?? {
-          date,
-          views: 0,
-          likes: 0,
-          comments: 0,
-          shares: 0,
-          erWeighted: 0,
-          videos: 0
-        };
-
-        current.views += row.views;
-        current.likes += row.likes;
-        current.comments += row.comments;
-        current.shares += row.shares;
-        current.erWeighted += youtubeEngagementRate(row) * row.views;
-        current.videos += 1;
-        byDate.set(date, current);
-      });
+      current.views += row.views;
+      current.likes += row.likes;
+      current.comments += row.comments;
+      current.shares += row.shares;
+      current.erWeighted += youtubeEngagementRate(row) * row.views;
+      current.videos += 1;
+      byDate.set(date, current);
+    });
 
     return [...byDate.values()]
       .sort((a, b) => a.date.localeCompare(b.date))
@@ -108,14 +149,17 @@ export default function YouTubeContentTrend({
         ...row,
         er: row.views ? row.erWeighted / row.views : 0
       }));
-  }, [rows, range]);
+  }, [rangeResult.rows]);
 
   const total = data.reduce((sum, row) => {
     if (metric === "er") return sum + row.er;
     return sum + row[metric];
   }, 0);
 
-  const totalVideos = data.reduce((sum, row) => sum + row.videos, 0);
+  const totalVideos = data.reduce(
+    (sum, row) => sum + row.videos,
+    0
+  );
 
   return (
     <section className="yt-card yt-content-trend-card yt-wide-card">
@@ -126,16 +170,18 @@ export default function YouTubeContentTrend({
         </div>
 
         <div className="yt-range-switcher" aria-label="Trend period">
-          {(Object.keys(rangeDays) as RangeKey[]).map((key) => (
-            <button
-              type="button"
-              key={key}
-              className={range === key ? "active" : ""}
-              onClick={() => setRange(key)}
-            >
-              {key}
-            </button>
-          ))}
+          {(Object.keys(youtubeContentRangeDays) as RangeKey[]).map(
+            (key) => (
+              <button
+                type="button"
+                key={key}
+                className={range === key ? "active" : ""}
+                onClick={() => setRange(key)}
+              >
+                {key}
+              </button>
+            )
+          )}
         </div>
       </div>
 
@@ -165,48 +211,72 @@ export default function YouTubeContentTrend({
       </div>
 
       <div className="yt-recharts-wrap">
-        <ResponsiveContainer width="100%" height="100%">
-          <LineChart
-            data={data}
-            margin={{ top: 16, right: 16, bottom: 0, left: 0 }}
-          >
-            <CartesianGrid strokeDasharray="4 4" vertical={false} stroke="#e7ebf3" />
-            <XAxis
-              dataKey="date"
-              tickFormatter={formatAxisDate}
-              tick={{ fill: "#7f8aa2", fontSize: 12 }}
-              axisLine={false}
-              tickLine={false}
-            />
-            <YAxis
-              tickFormatter={(value) => metric === "er" ? `${value}%` : formatCompact(value)}
-              tick={{ fill: "#7f8aa2", fontSize: 12 }}
-              axisLine={false}
-              tickLine={false}
-              width={56}
-            />
-            <Tooltip
-              labelFormatter={(label) => formatAxisDate(String(label))}
-              formatter={(value: number | string) => {
-                const numeric = Number(value);
-                return [metric === "er" ? `${numeric.toFixed(2)}%` : formatCompact(numeric), metricLabels[metric]];
-              }}
-              contentStyle={{
-                border: "1px solid #dfe5ef",
-                borderRadius: 12,
-                boxShadow: "0 12px 30px rgba(31,45,83,.12)"
-              }}
-            />
-            <Line
-              type="monotone"
-              dataKey={metric}
-              stroke="#4f6df5"
-              strokeWidth={3}
-              dot={false}
-              activeDot={{ r: 5 }}
-            />
-          </LineChart>
-        </ResponsiveContainer>
+        {data.length > 0 ? (
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart
+              data={data}
+              margin={{ top: 16, right: 16, bottom: 0, left: 0 }}
+            >
+              <CartesianGrid
+                strokeDasharray="4 4"
+                vertical={false}
+                stroke="#e7ebf3"
+              />
+              <XAxis
+                dataKey="date"
+                tickFormatter={formatAxisDate}
+                tick={{ fill: "#7f8aa2", fontSize: 12 }}
+                axisLine={false}
+                tickLine={false}
+              />
+              <YAxis
+                tickFormatter={(value) =>
+                  metric === "er"
+                    ? `${value}%`
+                    : formatCompact(value)
+                }
+                tick={{ fill: "#7f8aa2", fontSize: 12 }}
+                axisLine={false}
+                tickLine={false}
+                width={56}
+              />
+              <Tooltip
+                labelFormatter={(label) =>
+                  formatAxisDate(String(label))
+                }
+                formatter={(value: number | string) => {
+                  const numeric = Number(value);
+                  return [
+                    metric === "er"
+                      ? `${numeric.toFixed(2)}%`
+                      : formatCompact(numeric),
+                    metricLabels[metric]
+                  ];
+                }}
+                contentStyle={{
+                  border: "1px solid #dfe5ef",
+                  borderRadius: 12,
+                  boxShadow:
+                    "0 12px 30px rgba(31,45,83,.12)"
+                }}
+              />
+              <Line
+                type="monotone"
+                dataKey={metric}
+                stroke="#4f6df5"
+                strokeWidth={3}
+                dot={false}
+                activeDot={{ r: 5 }}
+                isAnimationActive
+                animationDuration={550}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        ) : (
+          <div className="yt-api-empty">
+            No YouTube content in this {range} period.
+          </div>
+        )}
       </div>
     </section>
   );

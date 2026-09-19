@@ -1,10 +1,15 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   type YouTubePreviewContent,
   youtubeEngagementRate
 } from "../youtubePreviewData";
+import {
+  getRowsForYouTubeContentRange,
+  type RangeKey,
+  YOUTUBE_CONTENT_RANGE_EVENT
+} from "./YouTubeContentTrend";
 
 type Analysis = {
   executive_summary: string;
@@ -42,18 +47,69 @@ export default function YouTubeContentPerformanceAI({
   toDate: string;
   live: boolean;
 }) {
+  const [range, setRange] = useState<RangeKey>("7D");
   const [result, setResult] = useState<StoredAnalysis | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  useEffect(() => {
+    function handleRangeChange(event: Event) {
+      const customEvent = event as CustomEvent<{
+        range?: RangeKey;
+      }>;
+
+      if (customEvent.detail?.range) {
+        setRange(customEvent.detail.range);
+        // Do not show an analysis generated for another range.
+        setResult(null);
+        setError(null);
+      }
+    }
+
+    window.addEventListener(
+      YOUTUBE_CONTENT_RANGE_EVENT,
+      handleRangeChange
+    );
+
+    return () => {
+      window.removeEventListener(
+        YOUTUBE_CONTENT_RANGE_EVENT,
+        handleRangeChange
+      );
+    };
+  }, []);
+
+  const rangeResult = useMemo(
+    () => getRowsForYouTubeContentRange(rows, range),
+    [rows, range]
+  );
+
+  const analysisRows = rangeResult.rows;
+
   const summary = useMemo(() => {
-    const views = rows.reduce((sum, row) => sum + row.views, 0);
-    const likes = rows.reduce((sum, row) => sum + row.likes, 0);
-    const comments = rows.reduce((sum, row) => sum + row.comments, 0);
-    const shares = rows.reduce((sum, row) => sum + row.shares, 0);
+    const views = analysisRows.reduce(
+      (sum, row) => sum + row.views,
+      0
+    );
+    const likes = analysisRows.reduce(
+      (sum, row) => sum + row.likes,
+      0
+    );
+    const comments = analysisRows.reduce(
+      (sum, row) => sum + row.comments,
+      0
+    );
+    const shares = analysisRows.reduce(
+      (sum, row) => sum + row.shares,
+      0
+    );
     const interactions = likes + comments + shares;
-    const avgViewed = rows.length
-      ? rows.reduce((sum, row) => sum + row.avgViewed, 0) / rows.length
+
+    const avgViewed = analysisRows.length
+      ? analysisRows.reduce(
+          (sum, row) => sum + row.avgViewed,
+          0
+        ) / analysisRows.length
       : 0;
 
     return {
@@ -62,10 +118,17 @@ export default function YouTubeContentPerformanceAI({
       comments,
       shares,
       interactions,
-      engagementRate: views ? (interactions / views) * 100 : 0,
+      engagementRate: views
+        ? (interactions / views) * 100
+        : 0,
       avgViewed
     };
-  }, [rows]);
+  }, [analysisRows]);
+
+  const effectiveFrom =
+    rangeResult.fromDate || fromDate;
+  const effectiveTo =
+    rangeResult.toDate || toDate;
 
   async function generate() {
     setLoading(true);
@@ -74,29 +137,40 @@ export default function YouTubeContentPerformanceAI({
     try {
       const response = await fetch("/api/ai/analyze", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json"
+        },
         body: JSON.stringify({
           platform: "YouTube",
-          account: `${channelName}${handle ? ` ${handle}` : ""}`,
+          account: `${channelName}${
+            handle ? ` ${handle}` : ""
+          }`,
           period: {
-            label: `${fromDate} – ${toDate}`,
-            from: fromDate,
-            to: toDate
+            label: range,
+            from: effectiveFrom,
+            to: effectiveTo
           },
           language: "Bahasa Indonesia",
           data: {
-            source: live ? "YouTube Data API + YouTube Analytics API" : "preview data",
+            source: live
+              ? "YouTube Data API + YouTube Analytics API"
+              : "preview data",
+            content_range: range,
             period_summary: {
-              content_count: rows.length,
+              content_count: analysisRows.length,
               views: summary.views,
               likes: summary.likes,
               comments: summary.comments,
               shares: summary.shares,
               interactions: summary.interactions,
-              engagement_rate_percent: Number(summary.engagementRate.toFixed(2)),
-              average_percentage_viewed: Number(summary.avgViewed.toFixed(1))
+              engagement_rate_percent: Number(
+                summary.engagementRate.toFixed(2)
+              ),
+              average_percentage_viewed: Number(
+                summary.avgViewed.toFixed(1)
+              )
             },
-            top_content: [...rows]
+            top_content: [...analysisRows]
               .sort((a, b) => b.views - a.views)
               .slice(0, 10)
               .map((row) => ({
@@ -107,28 +181,49 @@ export default function YouTubeContentPerformanceAI({
                 likes: row.likes,
                 comments: row.comments,
                 shares: row.shares,
-                engagement_rate_percent: Number(youtubeEngagementRate(row).toFixed(2)),
-                average_view_duration: row.avgViewDuration,
-                average_percentage_viewed: row.avgViewed
+                engagement_rate_percent: Number(
+                  youtubeEngagementRate(row).toFixed(2)
+                ),
+                average_view_duration:
+                  row.avgViewDuration,
+                average_percentage_viewed:
+                  row.avgViewed
               }))
           }
         })
       });
 
       const payload = await response.json();
-      if (!response.ok) throw new Error(payload?.error || "Unable to generate AI analysis.");
+
+      if (!response.ok) {
+        throw new Error(
+          payload?.error ||
+            "Unable to generate AI analysis."
+        );
+      }
+
       setResult(payload as StoredAnalysis);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to generate AI analysis.");
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Unable to generate AI analysis."
+      );
     } finally {
       setLoading(false);
     }
   }
 
-  const ranked = [...rows].sort((a, b) => b.views - a.views);
+  const ranked = [...analysisRows].sort(
+    (a, b) => b.views - a.views
+  );
+
   const top = ranked[0];
-  const strongest = [...rows].sort(
-    (a, b) => youtubeEngagementRate(b) - youtubeEngagementRate(a)
+
+  const strongest = [...analysisRows].sort(
+    (a, b) =>
+      youtubeEngagementRate(b) -
+      youtubeEngagementRate(a)
   )[0];
 
   return (
@@ -137,29 +232,65 @@ export default function YouTubeContentPerformanceAI({
         <div>
           <span>GEMINI AI</span>
           <h2>AI Content Performance Analysis</h2>
-          <p>Evidence-based analysis of the selected YouTube content period.</p>
+          <p>
+            Evidence-based analysis of the selected YouTube content
+            trend period.
+          </p>
         </div>
+
         <div className="yt-ai-action-wrap">
-          <div className="yt-ai-period">{fromDate} – {toDate}</div>
+          <div className="yt-ai-period">
+            Period: {range}
+          </div>
+
           <button
             type="button"
             className="yt-ai-refresh-button"
             onClick={generate}
-            disabled={loading || rows.length === 0}
+            disabled={
+              loading || analysisRows.length === 0
+            }
           >
-            {loading ? "Analyzing..." : result ? "↻ Refresh Analysis" : "✦ Generate AI Analysis"}
+            {loading
+              ? "Analyzing..."
+              : result
+                ? "↻ Refresh Analysis"
+                : "✦ Generate AI Analysis"}
           </button>
         </div>
       </div>
 
       <div className="yt-content-ai-kpis">
-        <div><span>CONTENTS</span><strong>{rows.length}</strong></div>
-        <div><span>VIEWS</span><strong>{formatCompact(summary.views)}</strong></div>
-        <div><span>ENGAGEMENT</span><strong>{summary.engagementRate.toFixed(2)}%</strong></div>
-        <div><span>AVG. VIEWED</span><strong>{summary.avgViewed.toFixed(1)}%</strong></div>
+        <div>
+          <span>CONTENTS</span>
+          <strong>{analysisRows.length}</strong>
+        </div>
+
+        <div>
+          <span>VIEWS</span>
+          <strong>
+            {formatCompact(summary.views)}
+          </strong>
+        </div>
+
+        <div>
+          <span>ENGAGEMENT</span>
+          <strong>
+            {summary.engagementRate.toFixed(2)}%
+          </strong>
+        </div>
+
+        <div>
+          <span>AVG. VIEWED</span>
+          <strong>
+            {summary.avgViewed.toFixed(1)}%
+          </strong>
+        </div>
       </div>
 
-      {error ? <div className="yt-ai-error">{error}</div> : null}
+      {error ? (
+        <div className="yt-ai-error">{error}</div>
+      ) : null}
 
       {result ? (
         <>
@@ -171,21 +302,42 @@ export default function YouTubeContentPerformanceAI({
           <div className="yt-ai-two-col">
             <article className="working">
               <h3>What&apos;s Working</h3>
-              <ul>{result.analysis.whats_working.map((item) => <li key={item}>{item}</li>)}</ul>
+              <ul>
+                {result.analysis.whats_working.map(
+                  (item) => (
+                    <li key={item}>{item}</li>
+                  )
+                )}
+              </ul>
             </article>
+
             <article className="attention">
               <h3>Needs Attention</h3>
-              <ul>{result.analysis.needs_attention.map((item) => <li key={item}>{item}</li>)}</ul>
+              <ul>
+                {result.analysis.needs_attention.map(
+                  (item) => (
+                    <li key={item}>{item}</li>
+                  )
+                )}
+              </ul>
             </article>
           </div>
 
           <div className="yt-ai-actions">
             <h3>Recommended Actions</h3>
-            <ol>{result.analysis.recommended_actions.map((item) => <li key={item}>{item}</li>)}</ol>
+            <ol>
+              {result.analysis.recommended_actions.map(
+                (item) => (
+                  <li key={item}>{item}</li>
+                )
+              )}
+            </ol>
           </div>
 
           <div className="yt-ai-footnote">
-            {result.analysis.confidence_note} • {result.model}
+            Period: {range} ({effectiveFrom} – {effectiveTo}) •{" "}
+            {result.analysis.confidence_note} •{" "}
+            {result.model}
           </div>
         </>
       ) : (
@@ -194,10 +346,22 @@ export default function YouTubeContentPerformanceAI({
             <span>EXECUTIVE SUMMARY</span>
             <p>
               {live
-                ? `Live YouTube data is ready for AI analysis. ${rows.length} content rows are available in the selected period.`
+                ? `Live YouTube data is ready for AI analysis. ${analysisRows.length} content rows are available in the ${range} Content Performance Trend period.`
                 : "Preview mode. Connect YouTube OAuth to analyze actual channel performance."}
-              {top ? ` Top reach: “${top.title}” (${formatCompact(top.views)} views).` : ""}
-              {strongest ? ` Strongest engagement: “${strongest.title}” (${youtubeEngagementRate(strongest).toFixed(2)}%).` : ""}
+
+              {top
+                ? ` Top reach: “${top.title}” (${formatCompact(
+                    top.views
+                  )} views).`
+                : ""}
+
+              {strongest
+                ? ` Strongest engagement: “${
+                    strongest.title
+                  }” (${youtubeEngagementRate(
+                    strongest
+                  ).toFixed(2)}%).`
+                : ""}
             </p>
           </div>
 
@@ -205,15 +369,30 @@ export default function YouTubeContentPerformanceAI({
             <article className="working">
               <h3>What&apos;s Working</h3>
               <ul>
-                <li>Connect live data, then use Gemini to identify statistically supported winning content patterns.</li>
-                <li>Views, interactions, average view duration and average percentage viewed are passed to the AI analysis.</li>
+                <li>
+                  The AI analysis uses the same {range} content rows
+                  currently shown by YouTube Content Performance
+                  Trend.
+                </li>
+                <li>
+                  Views, interactions, average view duration and
+                  average percentage viewed are sent to Gemini.
+                </li>
               </ul>
             </article>
+
             <article className="attention">
               <h3>Needs Attention</h3>
               <ul>
-                <li>AI recommendations are generated only when requested; the dashboard does not invent missing metrics.</li>
-                <li>YouTube Studio realtime and some audience-only Studio features are not exposed by the public APIs.</li>
+                <li>
+                  Changing 7D / 1M / 3M / 6M / 1Y clears the old AI
+                  result so analysis from another period is not shown
+                  accidentally.
+                </li>
+                <li>
+                  Generate the analysis again after changing the trend
+                  range.
+                </li>
               </ul>
             </article>
           </div>
