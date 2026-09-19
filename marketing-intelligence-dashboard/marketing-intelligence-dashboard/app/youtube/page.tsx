@@ -1,5 +1,7 @@
 import YouTubeContentTrend from "./components/YouTubeContentTrend";
 import YouTubeContentTable from "./components/YouTubeContentTable";
+import YouTubeGrowthComparison from "./components/YouTubeGrowthComparison";
+import YouTubeContentPerformanceAI from "./components/YouTubeContentPerformanceAI";
 import { youtubePreviewContent } from "./youtubePreviewData";
 
 const trendValues = [
@@ -223,6 +225,8 @@ export default async function YouTubeOverviewPage({ searchParams }: YouTubeOverv
           </article>
         </section>
 
+        <YouTubeGrowthComparison />
+
         <section className="yt-primary-grid">
           <article className="yt-card yt-trend-card">
             <div className="yt-card-head">
@@ -374,30 +378,6 @@ export default async function YouTubeOverviewPage({ searchParams }: YouTubeOverv
           <article className="yt-card">
             <div className="yt-card-head compact">
               <div>
-                <h2>Views by content type</h2>
-                <p>Views · Last 28 days</p>
-              </div>
-            </div>
-            <div className="yt-content-type">
-              <div className="yt-donut">
-                <div>
-                  <strong>78.2K</strong>
-                  <span>Total Views</span>
-                </div>
-              </div>
-              <div className="yt-legend">
-                <div><span className="c1" />Shorts <strong>86.2%</strong></div>
-                <div><span className="c2" />Videos <strong>13.1%</strong></div>
-                <div><span className="c3" />Live <strong>0.7%</strong></div>
-              </div>
-            </div>
-          </article>
-        </section>
-
-        <section className="yt-two-column-grid">
-          <article className="yt-card">
-            <div className="yt-card-head compact">
-              <div>
                 <h2>Audience</h2>
                 <p>Age distribution · Last 28 days</p>
               </div>
@@ -416,6 +396,30 @@ export default async function YouTubeOverviewPage({ searchParams }: YouTubeOverv
                   <strong>{value.toFixed(1)}%</strong>
                 </div>
               ))}
+            </div>
+          </article>
+        </section>
+
+        <section className="yt-two-column-grid">
+          <article className="yt-card">
+            <div className="yt-card-head compact">
+              <div>
+                <h2>Views by content type</h2>
+                <p>Views · Last 28 days</p>
+              </div>
+            </div>
+            <div className="yt-content-type">
+              <div className="yt-donut">
+                <div>
+                  <strong>78.2K</strong>
+                  <span>Total Views</span>
+                </div>
+              </div>
+              <div className="yt-legend">
+                <div><span className="c1" />Shorts <strong>86.2%</strong></div>
+                <div><span className="c2" />Videos <strong>13.1%</strong></div>
+                <div><span className="c3" />Live <strong>0.7%</strong></div>
+              </div>
             </div>
           </article>
 
@@ -445,6 +449,8 @@ export default async function YouTubeOverviewPage({ searchParams }: YouTubeOverv
         </section>
 
         <YouTubeContentTrend rows={filteredContent} />
+
+        <YouTubeContentPerformanceAI rows={filteredContent} />
 
         <section className="yt-card yt-top-content-card yt-wide-card">
           <div className="yt-card-head">
