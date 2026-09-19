@@ -1,13 +1,14 @@
-export default function YouTubeAIPerformancePage() {
+export default function Page() {
   return (
-    <div className="yt-placeholder-page">
-      <span>AI PERFORMANCE</span>
-      <h1>YouTube AI Performance Center</h1>
-      <p>
-        Placeholder untuk AI executive summary, performance score, funnel
-        diagnosis, retention intelligence, anomaly detection, recommended
-        actions, dan next content ideas.
-      </p>
+    <div className="yt-page-content">
+      <div className="yt-placeholder-page">
+        <span>YOUTUBE ANALYTICS</span>
+        <h1>AI Performance Center</h1>
+        <p>
+          Halaman ini disiapkan untuk fase berikutnya. Overview sudah menjadi UI utama,
+          dan modul ini akan diisi setelah data YouTube API mulai terhubung.
+        </p>
+      </div>
     </div>
   );
 }

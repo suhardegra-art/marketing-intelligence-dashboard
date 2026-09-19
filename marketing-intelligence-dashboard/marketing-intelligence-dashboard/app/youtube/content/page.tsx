@@ -1,13 +1,14 @@
-export default function YouTubeContentPage() {
+export default function Page() {
   return (
-    <div className="yt-placeholder-page">
-      <span>YOUTUBE ANALYTICS</span>
-      <h1>Content Performance</h1>
-      <p>
-        Halaman ini sudah terhubung ke sidebar YouTube. Modul Content akan kita
-        bangun pada langkah berikutnya: Shorts vs Videos, CTR, retention,
-        traffic source, dan performance per video.
-      </p>
+    <div className="yt-page-content">
+      <div className="yt-placeholder-page">
+        <span>YOUTUBE ANALYTICS</span>
+        <h1>Content Analytics</h1>
+        <p>
+          Halaman ini disiapkan untuk fase berikutnya. Overview sudah menjadi UI utama,
+          dan modul ini akan diisi setelah data YouTube API mulai terhubung.
+        </p>
+      </div>
     </div>
   );
 }

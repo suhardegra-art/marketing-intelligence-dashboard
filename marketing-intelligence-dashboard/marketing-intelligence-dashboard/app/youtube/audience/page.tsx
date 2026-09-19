@@ -1,12 +1,14 @@
-export default function YouTubeAudiencePage() {
+export default function Page() {
   return (
-    <div className="yt-placeholder-page">
-      <span>YOUTUBE ANALYTICS</span>
-      <h1>Audience Intelligence</h1>
-      <p>
-        Placeholder untuk Age & Gender, Device Type, Top Geographies,
-        subscribed vs not subscribed, unique viewers, dan audience trends.
-      </p>
+    <div className="yt-page-content">
+      <div className="yt-placeholder-page">
+        <span>YOUTUBE ANALYTICS</span>
+        <h1>Audience Analytics</h1>
+        <p>
+          Halaman ini disiapkan untuk fase berikutnya. Overview sudah menjadi UI utama,
+          dan modul ini akan diisi setelah data YouTube API mulai terhubung.
+        </p>
+      </div>
     </div>
   );
 }
