@@ -119,23 +119,34 @@ function trafficSourceLabel(value: string) {
     YT_OTHER_PAGE: "Other YouTube pages"
   };
 
-  return map[value] || value.replaceAll("_", " ").toLowerCase().replace(/\b\w/g, (char) => char.toUpperCase());
+  return (
+    map[value] ||
+    value
+      .replaceAll("_", " ")
+      .toLowerCase()
+      .replace(/\b\w/g, (char) => char.toUpperCase())
+  );
 }
 
 function contentTypeLabel(value: string) {
   if (value === "SHORTS") return "Shorts";
   if (value === "LIVE_STREAM") return "Live";
   if (value === "VIDEO_ON_DEMAND") return "Videos";
-  return value.replaceAll("_", " ").toLowerCase().replace(/\b\w/g, (char) => char.toUpperCase());
+  return value
+    .replaceAll("_", " ")
+    .toLowerCase()
+    .replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
 function ageLabel(value: string) {
-  return value
-    .replace("age", "")
-    .replace("65-", "65+")
-    .replace("65plus", "65+")
-    .replace("_", "–")
-    .replace("-", "–") + " years";
+  return (
+    value
+      .replace("age", "")
+      .replace("65-", "65+")
+      .replace("65plus", "65+")
+      .replace("_", "–")
+      .replace("-", "–") + " years"
+  );
 }
 
 function deviceLabel(value: string) {
@@ -149,9 +160,18 @@ function deviceLabel(value: string) {
   return map[value] || value;
 }
 
-function creatorContentTypeToPreview(value: string): YouTubePreviewContent["contentType"] {
+function creatorContentTypeToPreview(
+  value: string
+): YouTubePreviewContent["contentType"] {
   if (value === "SHORTS") return "Shorts";
   if (value === "LIVE_STREAM") return "Live";
+  return "Videos";
+}
+
+function inferContentTypeFromDuration(
+  durationSeconds: number | undefined
+): YouTubePreviewContent["contentType"] {
+  if (durationSeconds && durationSeconds <= 180) return "Shorts";
   return "Videos";
 }
 
@@ -161,7 +181,8 @@ function overviewFromRow(row: Record<string, string | number> | undefined) {
   const comments = numberValue(row, "comments");
   const shares = numberValue(row, "shares");
   const subscribersNet =
-    numberValue(row, "subscribersGained") - numberValue(row, "subscribersLost");
+    numberValue(row, "subscribersGained") -
+    numberValue(row, "subscribersLost");
   const interactions = likes + comments + shares;
 
   return {
@@ -204,7 +225,10 @@ export async function getYouTubeDashboardData(input?: {
     return {
       connected: false,
       configured: true,
-      message: error instanceof Error ? error.message : "Unable to load YouTube authorization."
+      message:
+        error instanceof Error
+          ? error.message
+          : "Unable to load YouTube authorization."
     };
   }
 
@@ -237,7 +261,9 @@ export async function getYouTubeDashboardData(input?: {
     subscribers: channel.subscribers,
     totalViews: channel.totalViews,
     totalVideos: channel.totalVideos
-  }).catch((error) => console.warn("YouTube snapshot save skipped", error));
+  }).catch((error) =>
+    console.warn("YouTube snapshot save skipped", error)
+  );
 
   const [
     overviewRows,
@@ -251,7 +277,8 @@ export async function getYouTubeDashboardData(input?: {
     deviceRows,
     countryRows,
     subscribedRows,
-    topVideoRows
+    topVideoRows,
+    topVideoTypeRows
   ] = await Promise.all([
     safeAnalyticsRows(accessToken, {
       startDate: fromDate,
@@ -290,7 +317,8 @@ export async function getYouTubeDashboardData(input?: {
       startDate: fromDate,
       endDate: toDate,
       dimensions: "creatorContentType",
-      metrics: "views,estimatedMinutesWatched,averageViewDuration,averageViewPercentage"
+      metrics:
+        "views,estimatedMinutesWatched,averageViewDuration,averageViewPercentage"
     }),
     safeAnalyticsRows(accessToken, {
       startDate: fromDate,
@@ -328,9 +356,17 @@ export async function getYouTubeDashboardData(input?: {
     safeAnalyticsRows(accessToken, {
       startDate: fromDate,
       endDate: toDate,
-      dimensions: "video,creatorContentType",
+      dimensions: "video",
       metrics:
         "views,estimatedMinutesWatched,averageViewDuration,averageViewPercentage,likes,comments,shares,subscribersGained,subscribersLost",
+      sort: "-views",
+      maxResults: 200
+    }),
+    safeAnalyticsRows(accessToken, {
+      startDate: fromDate,
+      endDate: toDate,
+      dimensions: "video,creatorContentType",
+      metrics: "views",
       sort: "-views",
       maxResults: 200
     })
@@ -367,21 +403,31 @@ export async function getYouTubeDashboardData(input?: {
     shares: numberValue(row, "shares")
   }));
 
-  const trafficTotal = trafficRows.reduce((sum, row) => sum + numberValue(row, "views"), 0);
+  const trafficTotal = trafficRows.reduce(
+    (sum, row) => sum + numberValue(row, "views"),
+    0
+  );
   const trafficSources = trafficRows.slice(0, 7).map((row) => {
     const views = numberValue(row, "views");
     return {
-      label: trafficSourceLabel(String(row.insightTrafficSourceType || "OTHER")),
+      label: trafficSourceLabel(
+        String(row.insightTrafficSourceType || "OTHER")
+      ),
       views,
       percentage: trafficTotal ? (views / trafficTotal) * 100 : 0
     };
   });
 
-  const contentTotal = contentTypeRows.reduce((sum, row) => sum + numberValue(row, "views"), 0);
+  const contentTotal = contentTypeRows.reduce(
+    (sum, row) => sum + numberValue(row, "views"),
+    0
+  );
   const contentTypes = contentTypeRows.map((row) => {
     const views = numberValue(row, "views");
     return {
-      label: contentTypeLabel(String(row.creatorContentType || "OTHER")),
+      label: contentTypeLabel(
+        String(row.creatorContentType || "OTHER")
+      ),
       views,
       percentage: contentTotal ? (views / contentTotal) * 100 : 0
     };
@@ -397,7 +443,10 @@ export async function getYouTubeDashboardData(input?: {
     percentage: numberValue(row, "viewerPercentage")
   }));
 
-  const deviceTotal = deviceRows.reduce((sum, row) => sum + numberValue(row, "views"), 0);
+  const deviceTotal = deviceRows.reduce(
+    (sum, row) => sum + numberValue(row, "views"),
+    0
+  );
   const devices = deviceRows.map((row) => {
     const views = numberValue(row, "views");
     return {
@@ -407,7 +456,10 @@ export async function getYouTubeDashboardData(input?: {
     };
   });
 
-  const countryTotal = countryRows.reduce((sum, row) => sum + numberValue(row, "views"), 0);
+  const countryTotal = countryRows.reduce(
+    (sum, row) => sum + numberValue(row, "views"),
+    0
+  );
   const geographies = countryRows.map((row) => {
     const views = numberValue(row, "views");
     return {
@@ -418,40 +470,89 @@ export async function getYouTubeDashboardData(input?: {
   });
 
   const subscribedTotal = subscribedRows.reduce(
-    (sum, row) => sum + numberValue(row, "estimatedMinutesWatched"),
+    (sum, row) =>
+      sum + numberValue(row, "estimatedMinutesWatched"),
     0
   );
   const subscribedStatus = subscribedRows.map((row) => {
-    const watchMinutes = numberValue(row, "estimatedMinutesWatched");
+    const watchMinutes = numberValue(
+      row,
+      "estimatedMinutesWatched"
+    );
     return {
       label: String(row.subscribedStatus || "UNKNOWN"),
       watchMinutes,
-      percentage: subscribedTotal ? (watchMinutes / subscribedTotal) * 100 : 0
+      percentage: subscribedTotal
+        ? (watchMinutes / subscribedTotal) * 100
+        : 0
     };
   });
 
-  const videoIds = topVideoRows.map((row) => String(row.video || "")).filter(Boolean);
-  const metadata = await getVideoMetadata(accessToken, videoIds);
+  const typeByVideo = new Map<string, string>();
 
-  const content: YouTubePreviewContent[] = topVideoRows.map((row) => {
-    const id = String(row.video || "");
-    const meta = metadata.get(id);
-    const creatorContentType = String(row.creatorContentType || "VIDEO_ON_DEMAND");
+  for (const row of topVideoTypeRows) {
+    const videoId = String(row.video || "");
+    const creatorContentType = String(
+      row.creatorContentType || ""
+    );
 
-    return {
-      id,
-      title: meta?.title || id,
-      publishedAt: meta?.publishedAt || `${fromDate}T00:00:00Z`,
-      views: numberValue(row, "views"),
-      likes: numberValue(row, "likes"),
-      comments: numberValue(row, "comments"),
-      shares: numberValue(row, "shares"),
-      avgViewDuration: formatDuration(numberValue(row, "averageViewDuration")),
-      avgViewed: numberValue(row, "averageViewPercentage"),
-      permalink: meta?.permalink || `https://www.youtube.com/watch?v=${id}`,
-      contentType: creatorContentTypeToPreview(creatorContentType)
-    };
-  });
+    if (videoId && creatorContentType) {
+      typeByVideo.set(videoId, creatorContentType);
+    }
+  }
+
+  const videoIds = topVideoRows
+    .map((row) => String(row.video || ""))
+    .filter(Boolean);
+
+  const metadata = await getVideoMetadata(
+    accessToken,
+    videoIds
+  );
+
+  const content: YouTubePreviewContent[] =
+    topVideoRows.map((row) => {
+      const id = String(row.video || "");
+      const meta = metadata.get(id);
+
+      const contentTypeFromAnalytics =
+        typeByVideo.get(id);
+
+      const contentType =
+        contentTypeFromAnalytics
+          ? creatorContentTypeToPreview(
+              contentTypeFromAnalytics
+            )
+          : inferContentTypeFromDuration(
+              meta?.durationSeconds
+            );
+
+      return {
+        id,
+        title: meta?.title || id,
+        publishedAt:
+          meta?.publishedAt ||
+          `${fromDate}T00:00:00Z`,
+        views: numberValue(row, "views"),
+        likes: numberValue(row, "likes"),
+        comments: numberValue(row, "comments"),
+        shares: numberValue(row, "shares"),
+        avgViewDuration: formatDuration(
+          numberValue(
+            row,
+            "averageViewDuration"
+          )
+        ),
+        avgViewed: numberValue(
+          row,
+          "averageViewPercentage"
+        ),
+        permalink:
+          meta?.permalink ||
+          `https://www.youtube.com/watch?v=${id}`,
+        contentType
+      };
+    });
 
   return {
     connected: true,
