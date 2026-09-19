@@ -53,6 +53,7 @@ const groups = [
 ];
 
 function itemHref(item: string) {
+  if (item === "Instagram") return "/instagram";
   if (item === "TikTok") return "/tiktok";
   if (item === "TikTok Live") return "/tiktok-live";
   if (item === "YouTube") return "/youtube";
