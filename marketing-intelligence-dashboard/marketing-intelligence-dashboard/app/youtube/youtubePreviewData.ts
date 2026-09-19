@@ -9,7 +9,7 @@ export type YouTubePreviewContent = {
   avgViewDuration: string;
   avgViewed: number;
   permalink: string;
-  contentType: "Shorts" | "Videos";
+  contentType: "Shorts" | "Videos" | "Live";
 };
 
 export const youtubePreviewContent: YouTubePreviewContent[] = [

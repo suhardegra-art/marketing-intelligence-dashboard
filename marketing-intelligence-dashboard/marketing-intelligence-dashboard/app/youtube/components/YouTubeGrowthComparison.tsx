@@ -10,6 +10,7 @@ import {
   XAxis,
   YAxis
 } from "recharts";
+import type { YouTubeDailyPoint } from "@/lib/youtube-dashboard";
 
 type RangeDays = 7 | 30 | 90 | 180 | 365;
 
@@ -65,24 +66,21 @@ function addDays(date: string, days: number) {
 
 function buildPreviewHistory(): GrowthPoint[] {
   const start = new Date("2025-09-20T00:00:00Z");
-  const totalDays = 365;
   const rows: GrowthPoint[] = [];
-
   let subscribers = 905;
   let views = 1250000;
   let watchMinutes = 118000;
   let engagements = 33800;
 
-  for (let index = 0; index < totalDays; index += 1) {
+  for (let index = 0; index < 365; index += 1) {
     const current = new Date(start);
     current.setUTCDate(start.getUTCDate() + index);
-
     const season = Math.sin(index / 14) * 0.22 + Math.cos(index / 33) * 0.18;
     const eventBoost = index > 345 && index < 355 ? 1.8 : 1;
     const dailyViews = Math.max(350, Math.round((1450 + (index % 9) * 95) * (1 + season) * eventBoost));
     const dailySubscribers = Math.max(0, Math.round(dailyViews / 1650 + ((index + 2) % 4 === 0 ? 1 : 0)));
-    const dailyWatch = Math.round(dailyViews * (0.205 + ((index % 5) * 0.008)));
-    const dailyEngagement = Math.round(dailyViews * (0.048 + ((index % 7) * 0.0015)));
+    const dailyWatch = Math.round(dailyViews * (0.205 + (index % 5) * 0.008));
+    const dailyEngagement = Math.round(dailyViews * (0.048 + (index % 7) * 0.0015));
 
     subscribers += dailySubscribers;
     views += dailyViews;
@@ -103,9 +101,38 @@ function buildPreviewHistory(): GrowthPoint[] {
 
 const PREVIEW_HISTORY = buildPreviewHistory();
 
-function filterSeries(endDate: string, days: number) {
+function buildLiveHistory(daily: YouTubeDailyPoint[], currentSubscribers: number): GrowthPoint[] {
+  if (daily.length === 0) return [];
+
+  const netSubscriberChange = daily.reduce(
+    (sum, row) => sum + row.subscribersGained - row.subscribersLost,
+    0
+  );
+
+  let subscribers = Math.max(0, currentSubscribers - netSubscriberChange);
+  let views = 0;
+  let watchMinutes = 0;
+  let engagements = 0;
+
+  return daily.map((row) => {
+    subscribers += row.subscribersGained - row.subscribersLost;
+    views += row.views;
+    watchMinutes += row.watchMinutes;
+    engagements += row.likes + row.comments + row.shares;
+
+    return {
+      date: row.date,
+      subscribers,
+      views,
+      watchMinutes,
+      engagements
+    };
+  });
+}
+
+function filterSeries(history: GrowthPoint[], endDate: string, days: number) {
   const fromDate = addDays(endDate, -(days - 1));
-  return PREVIEW_HISTORY.filter((point) => point.date >= fromDate && point.date <= endDate);
+  return history.filter((point) => point.date >= fromDate && point.date <= endDate);
 }
 
 function delta(series: GrowthPoint[], key: keyof Omit<GrowthPoint, "date">) {
@@ -169,16 +196,31 @@ function MiniGrowthChart({ data, valueType }: { data: ChartPoint[]; valueType: C
   );
 }
 
-export default function YouTubeGrowthComparison() {
+export default function YouTubeGrowthComparison({
+  daily,
+  currentSubscribers = 0,
+  live = false
+}: {
+  daily?: YouTubeDailyPoint[];
+  currentSubscribers?: number;
+  live?: boolean;
+}) {
   const [rangeDays, setRangeDays] = useState<RangeDays>(7);
-  const endDate = PREVIEW_HISTORY[PREVIEW_HISTORY.length - 1].date;
+
+  const history = useMemo(
+    () => (live && daily ? buildLiveHistory(daily, currentSubscribers) : PREVIEW_HISTORY),
+    [live, daily, currentSubscribers]
+  );
+
+  const endDate = history.at(-1)?.date || new Date().toISOString().slice(0, 10);
 
   const cards = useMemo<Card[]>(() => {
-    const series = filterSeries(endDate, rangeDays);
+    const series = filterSeries(history, endDate, rangeDays);
     const subscriberDelta = delta(series, "subscribers");
-    const subscriberGrowth = series.length >= 2 && series[0].subscribers > 0
-      ? (subscriberDelta / series[0].subscribers) * 100
-      : 0;
+    const subscriberGrowth =
+      series.length >= 2 && series[0].subscribers > 0
+        ? (subscriberDelta / series[0].subscribers) * 100
+        : 0;
 
     return [
       {
@@ -186,7 +228,9 @@ export default function YouTubeGrowthComparison() {
         title: "Subscriber Growth",
         value: subscriberGrowth,
         valueType: "percentage",
-        chart: normaliseSeries(series, "subscribers", (value, first) => first > 0 ? ((value - first) / first) * 100 : 0)
+        chart: normaliseSeries(series, "subscribers", (value, first) =>
+          first > 0 ? ((value - first) / first) * 100 : 0
+        )
       },
       {
         key: "views",
@@ -217,7 +261,7 @@ export default function YouTubeGrowthComparison() {
         chart: normaliseSeries(series, "subscribers")
       }
     ];
-  }, [rangeDays, endDate]);
+  }, [history, rangeDays, endDate]);
 
   const rangeFrom = addDays(endDate, -(rangeDays - 1));
 
@@ -226,7 +270,11 @@ export default function YouTubeGrowthComparison() {
       <div className="yt-growth-head">
         <div>
           <h2>YouTube Growth</h2>
-          <p>Historical YouTube performance based on daily channel snapshots.</p>
+          <p>
+            {live
+              ? "Historical YouTube performance from the YouTube Analytics API."
+              : "Preview growth data. Connect YouTube to load live analytics."}
+          </p>
           <span>{formatDate(rangeFrom)} – {formatDate(endDate)}</span>
         </div>
 
@@ -252,7 +300,7 @@ export default function YouTubeGrowthComparison() {
               {card.valueType === "percentage"
                 ? `${card.value >= 0 ? "+" : ""}${card.value.toFixed(1)}%`
                 : card.valueType === "hours"
-                  ? `+${card.value.toFixed(1)}h`
+                  ? `${card.value >= 0 ? "+" : ""}${card.value.toFixed(1)}h`
                   : `${card.value >= 0 ? "+" : ""}${formatCompact(card.value)}`}
             </strong>
             <MiniGrowthChart data={card.chart} valueType={card.valueType} />
