@@ -4,6 +4,7 @@ import YouTubeContentTable from "./components/YouTubeContentTable";
 import YouTubeContentTrend from "./components/YouTubeContentTrend";
 import YouTubeGrowthComparison from "./components/YouTubeGrowthComparison";
 import YouTubePerformanceTrend from "./components/YouTubePerformanceTrend";
+import YouTubePeriodSummary from "./components/YouTubePeriodSummary";
 import {
   youtubePreviewContent,
   youtubeEngagementRate,
@@ -27,6 +28,14 @@ type YouTubeOverviewProps = {
   }>;
 };
 
+const ALL_TIME_FROM = "2005-02-14";
+
+function yesterdayDate() {
+  const date = new Date();
+  date.setUTCDate(date.getUTCDate() - 1);
+  return date.toISOString().slice(0, 10);
+}
+
 function formatCompact(value: number) {
   return new Intl.NumberFormat("en-US", {
     notation: "compact",
@@ -46,17 +55,6 @@ function formatDate(value: string) {
   }).format(new Date(`${value.slice(0, 10)}T00:00:00Z`));
 }
 
-function defaultPeriod() {
-  const end = new Date();
-  end.setUTCDate(end.getUTCDate() - 1);
-  const start = new Date(end);
-  start.setUTCDate(start.getUTCDate() - 27);
-  return {
-    from: start.toISOString().slice(0, 10),
-    to: end.toISOString().slice(0, 10)
-  };
-}
-
 function changePercent(current: number, previous: number) {
   if (previous === 0) return current === 0 ? 0 : 100;
   return ((current - previous) / Math.abs(previous)) * 100;
@@ -68,9 +66,16 @@ function buildFallbackDaily(fromDate: string, toDate: string): YouTubeDailyPoint
   const rows: YouTubeDailyPoint[] = [];
   let index = 0;
 
-  for (let current = new Date(start); current <= end; current.setUTCDate(current.getUTCDate() + 1)) {
+  for (
+    let current = new Date(start);
+    current <= end;
+    current.setUTCDate(current.getUTCDate() + 1)
+  ) {
     const spike = index === 20 ? 2.8 : 1;
-    const views = Math.round((2200 + Math.sin(index / 2.7) * 650 + (index % 5) * 120) * spike);
+    const views = Math.round(
+      (2200 + Math.sin(index / 2.7) * 650 + (index % 5) * 120) * spike
+    );
+
     rows.push({
       date: current.toISOString().slice(0, 10),
       views: Math.max(300, views),
@@ -81,6 +86,7 @@ function buildFallbackDaily(fromDate: string, toDate: string): YouTubeDailyPoint
       comments: Math.round(Math.max(300, views) * 0.003),
       shares: Math.round(Math.max(300, views) * 0.004)
     });
+
     index += 1;
   }
 
@@ -117,11 +123,14 @@ function sortTopContent(rows: YouTubePreviewContent[]) {
   return [...rows].sort((a, b) => b.views - a.views).slice(0, 5);
 }
 
-export default async function YouTubeOverviewPage({ searchParams }: YouTubeOverviewProps) {
+export default async function YouTubeOverviewPage({
+  searchParams
+}: YouTubeOverviewProps) {
   const params = await searchParams;
-  const defaults = defaultPeriod();
-  const requestedFrom = params.from || defaults.from;
-  const requestedTo = params.to || defaults.to;
+
+  const hasCustomPeriod = Boolean(params.from || params.to);
+  const requestedFrom = params.from || ALL_TIME_FROM;
+  const requestedTo = params.to || yesterdayDate();
 
   const result = await getYouTubeDashboardData({
     from: requestedFrom,
@@ -134,19 +143,37 @@ export default async function YouTubeOverviewPage({ searchParams }: YouTubeOverv
   const fromDate = liveData?.fromDate || requestedFrom;
   const toDate = liveData?.toDate || requestedTo;
 
-  const fallbackFiltered = youtubePreviewContent.filter((item) => {
-    const date = item.publishedAt.slice(0, 10);
-    return date >= fromDate && date <= toDate;
-  });
+  const fallbackFiltered = hasCustomPeriod
+    ? youtubePreviewContent.filter((item) => {
+        const date = item.publishedAt.slice(0, 10);
+        const fromOk = params.from ? date >= params.from : true;
+        const toOk = params.to ? date <= params.to : true;
+        return fromOk && toOk;
+      })
+    : youtubePreviewContent;
 
   const content = liveData?.content || fallbackFiltered;
   const allContent = liveData?.content || youtubePreviewContent;
-  const daily = liveData?.daily || buildFallbackDaily(fromDate, toDate);
+
+  const fallbackDailyFrom = hasCustomPeriod
+    ? fromDate
+    : youtubePreviewContent
+        .map((item) => item.publishedAt.slice(0, 10))
+        .sort()[0] || requestedTo;
+
+  const daily =
+    liveData?.daily || buildFallbackDaily(fallbackDailyFrom, toDate);
+
   const growthDaily = liveData?.growthDaily || daily;
 
-  const fallbackViews = content.reduce((sum, row) => sum + row.views, 0);
+  const fallbackViews = content.reduce(
+    (sum, row) => sum + row.views,
+    0
+  );
+
   const fallbackInteractions = content.reduce(
-    (sum, row) => sum + row.likes + row.comments + row.shares,
+    (sum, row) =>
+      sum + row.likes + row.comments + row.shares,
     0
   );
 
@@ -157,10 +184,13 @@ export default async function YouTubeOverviewPage({ searchParams }: YouTubeOverv
     likes: content.reduce((sum, row) => sum + row.likes, 0),
     comments: content.reduce((sum, row) => sum + row.comments, 0),
     shares: content.reduce((sum, row) => sum + row.shares, 0),
-    engagementRate: fallbackViews ? (fallbackInteractions / fallbackViews) * 100 : 5.3,
+    engagementRate: fallbackViews
+      ? (fallbackInteractions / fallbackViews) * 100
+      : 5.3,
     averageViewDuration: 23,
     averageViewPercentage: content.length
-      ? content.reduce((sum, row) => sum + row.avgViewed, 0) / content.length
+      ? content.reduce((sum, row) => sum + row.avgViewed, 0) /
+        content.length
       : 0
   };
 
@@ -187,20 +217,47 @@ export default async function YouTubeOverviewPage({ searchParams }: YouTubeOverv
     ? liveData.trafficSources
     : FALLBACK_TRAFFIC.map((row) => ({ ...row, views: 0 }));
 
-  const ages = liveData?.ages.length ? liveData.ages : FALLBACK_AGES;
+  const ages = liveData?.ages.length
+    ? liveData.ages
+    : FALLBACK_AGES;
+
   const contentTypes = liveData?.contentTypes.length
     ? liveData.contentTypes
-    : FALLBACK_CONTENT_TYPES.map((row) => ({ ...row, views: 0 }));
+    : FALLBACK_CONTENT_TYPES.map((row) => ({
+        ...row,
+        views: 0
+      }));
 
   const topContent = sortTopContent(content);
-  const latestContent = [...content].sort((a, b) => b.publishedAt.localeCompare(a.publishedAt))[0];
 
-  const viewChange = changePercent(overview.views, previous.views);
-  const watchChange = changePercent(overview.watchHours, previous.watchHours);
-  const subscriberChange = changePercent(overview.subscribersNet, previous.subscribersNet);
-  const engagementChange = changePercent(overview.engagementRate, previous.engagementRate);
+  const latestContent = [...content].sort((a, b) =>
+    b.publishedAt.localeCompare(a.publishedAt)
+  )[0];
 
-  const fortyEightHourEstimate = daily.slice(-2).reduce((sum, row) => sum + row.views, 0);
+  const viewChange = changePercent(
+    overview.views,
+    previous.views
+  );
+
+  const watchChange = changePercent(
+    overview.watchHours,
+    previous.watchHours
+  );
+
+  const subscriberChange = changePercent(
+    overview.subscribersNet,
+    previous.subscribersNet
+  );
+
+  const engagementChange = changePercent(
+    overview.engagementRate,
+    previous.engagementRate
+  );
+
+  const fortyEightHourEstimate = daily
+    .slice(-2)
+    .reduce((sum, row) => sum + row.views, 0);
+
   const aiScore = Math.max(
     0,
     Math.min(
@@ -208,11 +265,38 @@ export default async function YouTubeOverviewPage({ searchParams }: YouTubeOverv
       Math.round(
         50 +
           Math.max(-15, Math.min(15, viewChange / 2)) +
-          Math.max(-10, Math.min(10, overview.averageViewPercentage / 10 - 5)) +
-          Math.max(-10, Math.min(10, overview.engagementRate * 2))
+          Math.max(
+            -10,
+            Math.min(
+              10,
+              overview.averageViewPercentage / 10 - 5
+            )
+          ) +
+          Math.max(
+            -10,
+            Math.min(10, overview.engagementRate * 2)
+          )
       )
     )
   );
+
+  const periodLabel = hasCustomPeriod
+    ? `${params.from ? formatDate(fromDate) : "Start"} – ${
+        params.to ? formatDate(toDate) : "Latest"
+      }`
+    : "All publish dates";
+
+  const videosInPeriod = hasCustomPeriod
+    ? content.length
+    : channel.totalVideos || allContent.length;
+
+  const videosStored =
+    channel.totalVideos || allContent.length;
+
+  const averageViewsPerVideo =
+    videosInPeriod > 0
+      ? Math.round(overview.views / videosInPeriod)
+      : 0;
 
   return (
     <div className="yt-page-content">
@@ -222,43 +306,69 @@ export default async function YouTubeOverviewPage({ searchParams }: YouTubeOverv
             <div className="yt-youtube-badge">▶</div>
             <div>
               <h1>YouTube Analytics</h1>
-              <p>Track performance, understand your audience, and grow your channel with data-driven insights.</p>
+              <p>
+                Track performance, understand your audience, and grow
+                your channel with data-driven insights.
+              </p>
             </div>
           </div>
 
           <div className="yt-top-actions">
             <button className="yt-date-button">
-              <span>{formatDate(fromDate)} – {formatDate(toDate)}</span>
+              <span>{periodLabel}</span>
               <small>{live ? "YouTube API" : "Preview data"}</small>
             </button>
+
             <YouTubeConnectionActions connected={live} />
           </div>
         </header>
 
         {params.youtube_error ? (
-          <div className="yt-api-alert error">YouTube connection error: {params.youtube_error}</div>
+          <div className="yt-api-alert error">
+            YouTube connection error: {params.youtube_error}
+          </div>
         ) : null}
+
         {params.youtube_connected ? (
-          <div className="yt-api-alert success">YouTube connected successfully. The dashboard is now reading live API data.</div>
+          <div className="yt-api-alert success">
+            YouTube connected successfully. The dashboard is now
+            reading live API data.
+          </div>
         ) : null}
+
         {!live ? (
           <div className="yt-api-alert info">
-            <strong>Preview mode.</strong> {result.connected ? "" : result.message} Connect YouTube to replace all preview metrics with live channel analytics.
+            <strong>Preview mode.</strong>{" "}
+            {result.connected ? "" : result.message} Connect YouTube
+            to replace all preview metrics with live channel
+            analytics.
           </div>
         ) : null}
 
         <section className="yt-channel-banner">
           <div className="yt-channel-copy">
-            <p className="yt-channel-overline">YOUTUBE CHANNEL {live ? "• LIVE API" : "• PREVIEW"}</p>
-            <h2>{channel.title}</h2>
-            <p className="yt-channel-meta">
-              {channel.handle || channel.id} • {formatCompact(channel.subscribers)} subscribers • Performance overview & audience intelligence
+            <p className="yt-channel-overline">
+              YOUTUBE CHANNEL {live ? "• LIVE API" : "• PREVIEW"}
             </p>
+
+            <h2>{channel.title}</h2>
+
+            <p className="yt-channel-meta">
+              {channel.handle || channel.id} •{" "}
+              {formatCompact(channel.subscribers)} subscribers •
+              Performance overview & audience intelligence
+            </p>
+
             <div className="yt-banner-pills">
-              <span>{formatDate(fromDate)} – {formatDate(toDate)}</span>
+              <span>{periodLabel}</span>
               <span>{formatCompact(overview.views)} views</span>
-              <span>{overview.watchHours.toFixed(1)} watch hours</span>
-              <span>{overview.subscribersNet >= 0 ? "+" : ""}{formatNumber(overview.subscribersNet)} subscribers</span>
+              <span>
+                {overview.watchHours.toFixed(1)} watch hours
+              </span>
+              <span>
+                {overview.subscribersNet >= 0 ? "+" : ""}
+                {formatNumber(overview.subscribersNet)} subscribers
+              </span>
             </div>
           </div>
 
@@ -268,47 +378,140 @@ export default async function YouTubeOverviewPage({ searchParams }: YouTubeOverv
             <div className="yt-banner-play">▶</div>
           </div>
 
-          <a className="yt-open-channel" href={channel.channelUrl} target="_blank" rel="noreferrer">
+          <a
+            className="yt-open-channel"
+            href={channel.channelUrl}
+            target="_blank"
+            rel="noreferrer"
+          >
             Open YouTube ↗
           </a>
         </section>
 
         <section className="yt-card yt-period-filter-card yt-wide-card">
-          <form action="/youtube" method="get" className="yt-period-form">
+          <form
+            action="/youtube"
+            method="get"
+            className="yt-period-form"
+          >
             <label>
               <span>From Date</span>
-              <input type="date" name="from" defaultValue={fromDate} max={toDate} />
+              <input
+                type="date"
+                name="from"
+                defaultValue={params.from || ""}
+                max={params.to || undefined}
+              />
             </label>
+
             <label>
               <span>To Date</span>
-              <input type="date" name="to" defaultValue={toDate} min={fromDate} />
+              <input
+                type="date"
+                name="to"
+                defaultValue={params.to || ""}
+                min={params.from || undefined}
+              />
             </label>
-            <button type="submit" className="yt-apply-period">Apply Period</button>
-            <a href="/youtube" className="yt-reset-period">Reset</a>
+
+            <button
+              type="submit"
+              className="yt-apply-period"
+            >
+              Apply Period
+            </button>
+
+            <a href="/youtube" className="yt-reset-period">
+              Reset
+            </a>
           </form>
+
           <div className="yt-period-meta">
-            <span>Selected analytics period: <strong>{formatDate(fromDate)} – {formatDate(toDate)}</strong></span>
-            <span>{live ? "Analytics API uses activity date; content table uses videos active in the period." : "Preview mode until OAuth is connected."}</span>
+            <span>
+              Selected content period:{" "}
+              <strong>{periodLabel}</strong>
+            </span>
+
+            <span>
+              {live
+                ? "Metrics update to the selected period. Reset returns to All publish dates."
+                : "Preview mode until OAuth is connected."}
+            </span>
           </div>
         </section>
 
+        <YouTubePeriodSummary
+          subscribers={channel.subscribers}
+          totalVideos={videosStored}
+          videosInPeriod={videosInPeriod}
+          views={overview.views}
+          averageViewsPerVideo={averageViewsPerVideo}
+          likes={overview.likes}
+          comments={overview.comments}
+          shares={overview.shares}
+        />
+
         <section className="yt-kpi-grid">
           {[
-            ["◉", "Views", formatCompact(overview.views), viewChange, `${formatCompact(previous.views)} previous period`],
-            ["◷", "Watch time (hours)", overview.watchHours.toFixed(1), watchChange, `${previous.watchHours.toFixed(1)}h previous period`],
-            ["◎", "Subscribers", `${overview.subscribersNet >= 0 ? "+" : ""}${formatNumber(overview.subscribersNet)}`, subscriberChange, `${previous.subscribersNet >= 0 ? "+" : ""}${formatNumber(previous.subscribersNet)} previous period`],
-            ["♡", "Engagement rate", `${overview.engagementRate.toFixed(2)}%`, engagementChange, `${previous.engagementRate.toFixed(2)}% previous period`]
+            [
+              "◉",
+              "Views",
+              formatCompact(overview.views),
+              viewChange,
+              `${formatCompact(previous.views)} previous period`
+            ],
+            [
+              "◷",
+              "Watch time (hours)",
+              overview.watchHours.toFixed(1),
+              watchChange,
+              `${previous.watchHours.toFixed(1)}h previous period`
+            ],
+            [
+              "◎",
+              "Subscribers",
+              `${overview.subscribersNet >= 0 ? "+" : ""}${formatNumber(
+                overview.subscribersNet
+              )}`,
+              subscriberChange,
+              `${
+                previous.subscribersNet >= 0 ? "+" : ""
+              }${formatNumber(previous.subscribersNet)} previous period`
+            ],
+            [
+              "♡",
+              "Engagement rate",
+              `${overview.engagementRate.toFixed(2)}%`,
+              engagementChange,
+              `${previous.engagementRate.toFixed(2)}% previous period`
+            ]
           ].map(([icon, label, value, change, note]) => {
             const numericChange = Number(change);
+
             return (
-              <article className="yt-kpi-card" key={String(label)}>
-                <span className="yt-kpi-icon">{String(icon)}</span>
+              <article
+                className="yt-kpi-card"
+                key={String(label)}
+              >
+                <span className="yt-kpi-icon">
+                  {String(icon)}
+                </span>
+
                 <div>
                   <p>{String(label)}</p>
                   <strong>{String(value)}</strong>
-                  <small className={numericChange >= 0 ? "yt-positive" : "yt-negative"}>
-                    {numericChange >= 0 ? "↑" : "↓"} {Math.abs(numericChange).toFixed(1)}%
+
+                  <small
+                    className={
+                      numericChange >= 0
+                        ? "yt-positive"
+                        : "yt-negative"
+                    }
+                  >
+                    {numericChange >= 0 ? "↑" : "↓"}{" "}
+                    {Math.abs(numericChange).toFixed(1)}%
                   </small>
+
                   <em>{String(note)}</em>
                 </div>
               </article>
@@ -329,22 +532,51 @@ export default async function YouTubeOverviewPage({ searchParams }: YouTubeOverv
             <div className="yt-card-head compact">
               <div>
                 <h2>Realtime Monitor</h2>
-                <p><span className="yt-live-dot" /> API estimate</p>
+                <p>
+                  <span className="yt-live-dot" /> API estimate
+                </p>
               </div>
             </div>
+
             <div className="yt-realtime-metric">
-              <strong>{formatCompact(fortyEightHourEstimate)}</strong>
-              <span>Views · last 2 finalized API days*</span>
+              <strong>
+                {formatCompact(fortyEightHourEstimate)}
+              </strong>
+
+              <span>
+                Views · last 2 finalized API days*
+              </span>
+
               <div className="yt-mini-bars big">
                 {daily.slice(-36).map((row, index) => {
-                  const max = Math.max(...daily.slice(-36).map((point) => point.views), 1);
-                  return <i key={`${row.date}-${index}`} style={{ height: `${Math.max(8, (row.views / max) * 70)}px` }} />;
+                  const max = Math.max(
+                    ...daily
+                      .slice(-36)
+                      .map((point) => point.views),
+                    1
+                  );
+
+                  return (
+                    <i
+                      key={`${row.date}-${index}`}
+                      style={{
+                        height: `${Math.max(
+                          8,
+                          (row.views / max) * 70
+                        )}px`
+                      }}
+                    />
+                  );
                 })}
               </div>
             </div>
+
             <div className="yt-realtime-metric second">
               <strong>—</strong>
-              <span>Last 60 minutes is not exposed by the public Analytics API</span>
+              <span>
+                Last 60 minutes is not exposed by the public Analytics
+                API
+              </span>
             </div>
           </article>
         </section>
@@ -353,8 +585,13 @@ export default async function YouTubeOverviewPage({ searchParams }: YouTubeOverv
           <div className="yt-card-head">
             <div>
               <h2>✦ AI Performance Summary</h2>
-              <p>Calculated from {live ? "live YouTube API" : "preview"} performance signals</p>
+              <p>
+                Calculated from{" "}
+                {live ? "live YouTube API" : "preview"} performance
+                signals
+              </p>
             </div>
+
             <span className="yt-beta">Beta</span>
           </div>
 
@@ -368,21 +605,100 @@ export default async function YouTubeOverviewPage({ searchParams }: YouTubeOverv
             </div>
 
             <div className="yt-score-list">
-              <div><span>Growth</span><strong className={viewChange >= 0 ? "good" : "warn"}>● {viewChange >= 10 ? "Strong" : viewChange >= 0 ? "Stable" : "Needs Attention"}</strong></div>
-              <div><span>Content Efficiency</span><strong className={overview.engagementRate >= 2 ? "good" : "warn"}>● {overview.engagementRate >= 2 ? "Good" : "Moderate"}</strong></div>
-              <div><span>Audience Retention</span><strong className={overview.averageViewPercentage >= 65 ? "good" : "warn"}>● {overview.averageViewPercentage >= 65 ? "Good" : "Needs Attention"}</strong></div>
-              <div><span>Discovery</span><strong className="good">● {trafficSources[0]?.label || "Available"}</strong></div>
-              <div><span>Subscriber Conversion</span><strong className={overview.subscribersNet >= 0 ? "good" : "warn"}>● {overview.subscribersNet >= 0 ? "Positive" : "Negative"}</strong></div>
+              <div>
+                <span>Growth</span>
+                <strong
+                  className={
+                    viewChange >= 0 ? "good" : "warn"
+                  }
+                >
+                  ●{" "}
+                  {viewChange >= 10
+                    ? "Strong"
+                    : viewChange >= 0
+                      ? "Stable"
+                      : "Needs Attention"}
+                </strong>
+              </div>
+
+              <div>
+                <span>Content Efficiency</span>
+                <strong
+                  className={
+                    overview.engagementRate >= 2
+                      ? "good"
+                      : "warn"
+                  }
+                >
+                  ●{" "}
+                  {overview.engagementRate >= 2
+                    ? "Good"
+                    : "Moderate"}
+                </strong>
+              </div>
+
+              <div>
+                <span>Audience Retention</span>
+                <strong
+                  className={
+                    overview.averageViewPercentage >= 65
+                      ? "good"
+                      : "warn"
+                  }
+                >
+                  ●{" "}
+                  {overview.averageViewPercentage >= 65
+                    ? "Good"
+                    : "Needs Attention"}
+                </strong>
+              </div>
+
+              <div>
+                <span>Discovery</span>
+                <strong className="good">
+                  ● {trafficSources[0]?.label || "Available"}
+                </strong>
+              </div>
+
+              <div>
+                <span>Subscriber Conversion</span>
+                <strong
+                  className={
+                    overview.subscribersNet >= 0
+                      ? "good"
+                      : "warn"
+                  }
+                >
+                  ●{" "}
+                  {overview.subscribersNet >= 0
+                    ? "Positive"
+                    : "Negative"}
+                </strong>
+              </div>
             </div>
 
             <div className="yt-ai-summary-copy">
               <strong>Executive Signal</strong>
+
               <p>
                 {live
-                  ? `Channel menghasilkan ${formatCompact(overview.views)} views dan ${overview.watchHours.toFixed(1)} jam watch time pada periode ini. Sumber traffic terbesar adalah ${trafficSources[0]?.label || "belum tersedia"}, sementara ${contentTypes[0]?.label || "konten"} menjadi format dengan kontribusi views terbesar.`
+                  ? `Channel menghasilkan ${formatCompact(
+                      overview.views
+                    )} views dan ${overview.watchHours.toFixed(
+                      1
+                    )} jam watch time pada periode ini. Sumber traffic terbesar adalah ${
+                      trafficSources[0]?.label ||
+                      "belum tersedia"
+                    }, sementara ${
+                      contentTypes[0]?.label || "konten"
+                    } menjadi format dengan kontribusi views terbesar.`
                   : "Dashboard masih menggunakan preview data. Hubungkan YouTube OAuth untuk menghasilkan summary berdasarkan data channel aktual."}
               </p>
-              <span className="yt-ai-link">Gunakan AI Content Performance Analysis di bawah untuk insight Gemini berbasis data aktual.</span>
+
+              <span className="yt-ai-link">
+                Gunakan AI Content Performance Analysis di bawah untuk
+                insight Gemini berbasis data aktual.
+              </span>
             </div>
           </div>
         </section>
@@ -395,12 +711,27 @@ export default async function YouTubeOverviewPage({ searchParams }: YouTubeOverv
                 <p>Views · selected period</p>
               </div>
             </div>
+
             <div className="yt-bars-list">
               {trafficSources.map((row) => (
-                <div className="yt-bars-row" key={row.label}>
+                <div
+                  className="yt-bars-row"
+                  key={row.label}
+                >
                   <span>{row.label}</span>
-                  <div><i style={{ width: `${Math.min(100, row.percentage * 2)}%` }} /></div>
-                  <strong>{row.percentage.toFixed(1)}%</strong>
+                  <div>
+                    <i
+                      style={{
+                        width: `${Math.min(
+                          100,
+                          row.percentage * 2
+                        )}%`
+                      }}
+                    />
+                  </div>
+                  <strong>
+                    {row.percentage.toFixed(1)}%
+                  </strong>
                 </div>
               ))}
             </div>
@@ -413,18 +744,34 @@ export default async function YouTubeOverviewPage({ searchParams }: YouTubeOverv
                 <p>Age distribution · selected period</p>
               </div>
             </div>
+
             <div className="yt-audience-tabs">
               <button className="active">Age</button>
               <button>Gender</button>
               <button>Device</button>
               <button>Top geographies</button>
             </div>
+
             <div className="yt-bars-list audience">
               {ages.map((row) => (
-                <div className="yt-bars-row" key={row.label}>
+                <div
+                  className="yt-bars-row"
+                  key={row.label}
+                >
                   <span>{row.label}</span>
-                  <div><i style={{ width: `${Math.min(100, row.percentage * 2.2)}%` }} /></div>
-                  <strong>{row.percentage.toFixed(1)}%</strong>
+                  <div>
+                    <i
+                      style={{
+                        width: `${Math.min(
+                          100,
+                          row.percentage * 2.2
+                        )}%`
+                      }}
+                    />
+                  </div>
+                  <strong>
+                    {row.percentage.toFixed(1)}%
+                  </strong>
                 </div>
               ))}
             </div>
@@ -439,20 +786,34 @@ export default async function YouTubeOverviewPage({ searchParams }: YouTubeOverv
                 <p>Views · selected period</p>
               </div>
             </div>
+
             <div className="yt-content-type">
               <div className="yt-donut">
                 <div>
-                  <strong>{formatCompact(overview.views)}</strong>
+                  <strong>
+                    {formatCompact(overview.views)}
+                  </strong>
                   <span>Total Views</span>
                 </div>
               </div>
+
               <div className="yt-legend">
-                {contentTypes.slice(0, 4).map((row, index) => (
-                  <div key={row.label}>
-                    <span className={`c${Math.min(index + 1, 3)}`} />
-                    {row.label} <strong>{row.percentage.toFixed(1)}%</strong>
-                  </div>
-                ))}
+                {contentTypes
+                  .slice(0, 4)
+                  .map((row, index) => (
+                    <div key={row.label}>
+                      <span
+                        className={`c${Math.min(
+                          index + 1,
+                          3
+                        )}`}
+                      />
+                      {row.label}{" "}
+                      <strong>
+                        {row.percentage.toFixed(1)}%
+                      </strong>
+                    </div>
+                  ))}
               </div>
             </div>
           </article>
@@ -461,21 +822,59 @@ export default async function YouTubeOverviewPage({ searchParams }: YouTubeOverv
             <div className="yt-card-head compact">
               <div>
                 <h2>◎ Insights Highlight</h2>
-                <p>Automatically derived from current channel signals</p>
+                <p>
+                  Automatically derived from current channel signals
+                </p>
               </div>
             </div>
+
             <div className="yt-insight-list">
               <div>
                 <span className="green">↗</span>
-                <p><strong>{viewChange >= 0 ? "Views tumbuh" : "Views menurun"} {Math.abs(viewChange).toFixed(1)}%</strong><small>Dibanding periode sebelumnya dengan durasi yang sama.</small></p>
+                <p>
+                  <strong>
+                    {viewChange >= 0
+                      ? "Views tumbuh"
+                      : "Views menurun"}{" "}
+                    {Math.abs(viewChange).toFixed(1)}%
+                  </strong>
+                  <small>
+                    Dibanding periode sebelumnya dengan durasi yang
+                    sama.
+                  </small>
+                </p>
               </div>
+
               <div>
                 <span className="yellow">!</span>
-                <p><strong>Average viewed {overview.averageViewPercentage.toFixed(1)}%</strong><small>{overview.averageViewPercentage >= 65 ? "Retention agregat cukup kuat." : "Perkuat hook dan struktur konten."}</small></p>
+                <p>
+                  <strong>
+                    Average viewed{" "}
+                    {overview.averageViewPercentage.toFixed(1)}%
+                  </strong>
+                  <small>
+                    {overview.averageViewPercentage >= 65
+                      ? "Retention agregat cukup kuat."
+                      : "Perkuat hook dan struktur konten."}
+                  </small>
+                </p>
               </div>
+
               <div>
                 <span className="blue">▥</span>
-                <p><strong>{contentTypes[0]?.label || "Content"} memimpin reach</strong><small>{contentTypes[0] ? `${contentTypes[0].percentage.toFixed(1)}% dari views berdasarkan creatorContentType.` : "Menunggu data."}</small></p>
+                <p>
+                  <strong>
+                    {contentTypes[0]?.label || "Content"} memimpin
+                    reach
+                  </strong>
+                  <small>
+                    {contentTypes[0]
+                      ? `${contentTypes[0].percentage.toFixed(
+                          1
+                        )}% dari views berdasarkan creatorContentType.`
+                      : "Menunggu data."}
+                  </small>
+                </p>
               </div>
             </div>
           </article>
@@ -496,9 +895,13 @@ export default async function YouTubeOverviewPage({ searchParams }: YouTubeOverv
           <div className="yt-card-head">
             <div>
               <h2>Top Content</h2>
-              <p>Best-performing content in the selected analytics period</p>
+              <p>
+                Best-performing content in the selected analytics
+                period
+              </p>
             </div>
           </div>
+
           <div className="yt-table-wrap">
             <table className="yt-table">
               <thead>
@@ -513,13 +916,25 @@ export default async function YouTubeOverviewPage({ searchParams }: YouTubeOverv
                   <th>Comments</th>
                 </tr>
               </thead>
+
               <tbody>
                 {topContent.map((item, index) => (
                   <tr key={item.id}>
                     <td>{index + 1}</td>
-                    <td><div className="yt-content-cell"><span className={`yt-thumb t${index + 1}`} /><span>{item.title}</span></div></td>
+                    <td>
+                      <div className="yt-content-cell">
+                        <span
+                          className={`yt-thumb t${index + 1}`}
+                        />
+                        <span>{item.title}</span>
+                      </div>
+                    </td>
                     <td>{formatDate(item.publishedAt)}</td>
-                    <td><strong>{formatNumber(item.views)}</strong></td>
+                    <td>
+                      <strong>
+                        {formatNumber(item.views)}
+                      </strong>
+                    </td>
                     <td>{item.avgViewDuration}</td>
                     <td>{item.avgViewed.toFixed(1)}%</td>
                     <td>{formatNumber(item.likes)}</td>
@@ -539,20 +954,38 @@ export default async function YouTubeOverviewPage({ searchParams }: YouTubeOverv
                 <p>{formatDate(latestContent.publishedAt)}</p>
               </div>
             </div>
+
             <div className="yt-latest-api-row">
               <div>
                 <h3>{latestContent.title}</h3>
-                <p>{formatCompact(latestContent.views)} views • {latestContent.avgViewDuration} avg duration • {latestContent.avgViewed.toFixed(1)}% viewed</p>
+                <p>
+                  {formatCompact(latestContent.views)} views •{" "}
+                  {latestContent.avgViewDuration} avg duration •{" "}
+                  {latestContent.avgViewed.toFixed(1)}% viewed
+                </p>
               </div>
-              <a href={latestContent.permalink} target="_blank" rel="noreferrer">Open video ↗</a>
+
+              <a
+                href={latestContent.permalink}
+                target="_blank"
+                rel="noreferrer"
+              >
+                Open video ↗
+              </a>
             </div>
           </section>
         ) : null}
 
-        <YouTubeContentTable filteredRows={content} allRows={allContent} />
+        <YouTubeContentTable
+          filteredRows={content}
+          allRows={allContent}
+        />
 
         <footer className="yt-footer">
-          YouTube Analytics Dashboard • {live ? "Live YouTube Data API + YouTube Analytics API" : "Preview Mode"}
+          YouTube Analytics Dashboard •{" "}
+          {live
+            ? "Live YouTube Data API + YouTube Analytics API"
+            : "Preview Mode"}
         </footer>
       </div>
     </div>
