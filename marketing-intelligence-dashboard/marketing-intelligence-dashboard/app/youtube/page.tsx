@@ -163,17 +163,24 @@ export default async function YouTubeOverviewPage({
   const fromDate = liveData?.fromDate || requestedFrom;
   const toDate = liveData?.toDate || requestedTo;
 
-  const fallbackFiltered = hasCustomPeriod
-    ? youtubePreviewContent.filter((item) => {
-        const date = item.publishedAt.slice(0, 10);
-        const fromOk = params.from ? date >= params.from : true;
-        const toOk = params.to ? date <= params.to : true;
+  const sourceContent =
+    liveData?.content || youtubePreviewContent;
+
+  const content = hasCustomPeriod
+    ? sourceContent.filter((item) => {
+        const publishDate = item.publishedAt.slice(0, 10);
+        const fromOk = params.from
+          ? publishDate >= params.from
+          : true;
+        const toOk = params.to
+          ? publishDate <= params.to
+          : true;
+
         return fromOk && toOk;
       })
-    : youtubePreviewContent;
+    : sourceContent;
 
-  const content = liveData?.content || fallbackFiltered;
-  const allContent = liveData?.content || youtubePreviewContent;
+  const allContent = sourceContent;
 
   const fallbackDailyFrom = hasCustomPeriod
     ? fromDate
@@ -821,7 +828,7 @@ export default async function YouTubeOverviewPage({
             <div>
               <h2>Top Content</h2>
               <p>
-                Best-performing content in the selected analytics
+                Best-performing videos published in the selected date
                 period
               </p>
             </div>
