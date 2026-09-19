@@ -5,6 +5,7 @@ import YouTubeContentTrend from "./components/YouTubeContentTrend";
 import YouTubeGrowthComparison from "./components/YouTubeGrowthComparison";
 import YouTubePerformanceTrend from "./components/YouTubePerformanceTrend";
 import YouTubePeriodSummary from "./components/YouTubePeriodSummary";
+import YouTubeAudiencePanel from "./components/YouTubeAudiencePanel";
 import {
   youtubePreviewContent,
   youtubeEngagementRate,
@@ -111,6 +112,25 @@ const FALLBACK_AGES = [
   { label: "45–54 years", percentage: 18.3 },
   { label: "55–64 years", percentage: 4.5 },
   { label: "65+ years", percentage: 0.6 }
+];
+
+const FALLBACK_GENDERS = [
+  { label: "female", percentage: 17.5 },
+  { label: "male", percentage: 82.5 },
+  { label: "userSpecified", percentage: 0.0 }
+];
+
+const FALLBACK_DEVICES = [
+  { label: "Mobile phone", views: 0, percentage: 84.3 },
+  { label: "Computer", views: 0, percentage: 7.5 },
+  { label: "TV", views: 0, percentage: 4.7 },
+  { label: "Tablet", views: 0, percentage: 3.5 }
+];
+
+const FALLBACK_GEOGRAPHIES = [
+  { label: "ID", views: 0, percentage: 96.0 },
+  { label: "MY", views: 0, percentage: 0.8 },
+  { label: "IN", views: 0, percentage: 0.0 }
 ];
 
 const FALLBACK_CONTENT_TYPES = [
@@ -220,6 +240,18 @@ export default async function YouTubeOverviewPage({
   const ages = liveData?.ages.length
     ? liveData.ages
     : FALLBACK_AGES;
+
+  const genders = liveData?.genders.length
+    ? liveData.genders
+    : FALLBACK_GENDERS;
+
+  const devices = liveData?.devices.length
+    ? liveData.devices
+    : FALLBACK_DEVICES;
+
+  const geographies = liveData?.geographies.length
+    ? liveData.geographies
+    : FALLBACK_GEOGRAPHIES;
 
   const contentTypes = liveData?.contentTypes.length
     ? liveData.contentTypes
@@ -667,45 +699,12 @@ export default async function YouTubeOverviewPage({
             </div>
           </article>
 
-          <article className="yt-card">
-            <div className="yt-card-head compact">
-              <div>
-                <h2>Audience</h2>
-                <p>Age distribution · selected period</p>
-              </div>
-            </div>
-
-            <div className="yt-audience-tabs">
-              <button className="active">Age</button>
-              <button>Gender</button>
-              <button>Device</button>
-              <button>Top geographies</button>
-            </div>
-
-            <div className="yt-bars-list audience">
-              {ages.map((row) => (
-                <div
-                  className="yt-bars-row"
-                  key={row.label}
-                >
-                  <span>{row.label}</span>
-                  <div>
-                    <i
-                      style={{
-                        width: `${Math.min(
-                          100,
-                          row.percentage * 2.2
-                        )}%`
-                      }}
-                    />
-                  </div>
-                  <strong>
-                    {row.percentage.toFixed(1)}%
-                  </strong>
-                </div>
-              ))}
-            </div>
-          </article>
+          <YouTubeAudiencePanel
+            ages={ages}
+            genders={genders}
+            devices={devices}
+            geographies={geographies}
+          />
         </section>
 
         <section className="yt-two-column-grid">
