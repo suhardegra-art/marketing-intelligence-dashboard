@@ -843,6 +843,7 @@ export default async function YouTubeOverviewPage({
                   <th>Avg % viewed</th>
                   <th>Likes</th>
                   <th>Comments</th>
+                  <th>Video Link</th>
                 </tr>
               </thead>
 
@@ -851,10 +852,10 @@ export default async function YouTubeOverviewPage({
                   <tr key={item.id}>
                     <td>{index + 1}</td>
                     <td>
-                      <div className="yt-content-cell">
-                        <span
-                          className={`yt-thumb t${index + 1}`}
-                        />
+                      <div
+                        className="yt-content-cell"
+                        style={{ minWidth: 0 }}
+                      >
                         <span>{item.title}</span>
                       </div>
                     </td>
@@ -868,6 +869,27 @@ export default async function YouTubeOverviewPage({
                     <td>{item.avgViewed.toFixed(1)}%</td>
                     <td>{formatNumber(item.likes)}</td>
                     <td>{formatNumber(item.comments)}</td>
+                    <td>
+                      <a
+                        href={item.permalink}
+                        target="_blank"
+                        rel="noreferrer"
+                        title={item.permalink}
+                        style={{
+                          display: "inline-block",
+                          maxWidth: 230,
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                          color: "#4059d7",
+                          fontWeight: 800,
+                          textDecoration: "none",
+                          verticalAlign: "middle"
+                        }}
+                      >
+                        {item.permalink.replace(/^https?:\/\/(www\.)?/, "")}
+                      </a>
+                    </td>
                   </tr>
                 ))}
               </tbody>
