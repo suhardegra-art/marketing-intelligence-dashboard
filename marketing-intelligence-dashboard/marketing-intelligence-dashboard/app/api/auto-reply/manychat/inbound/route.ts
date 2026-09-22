@@ -76,12 +76,12 @@ function authorized(request: NextRequest) {
 
 function fallbackEventId(input: {
   contactId: string;
+  contentId: string;
   text: string;
-  createdAt: string;
 }) {
   return createHash("sha256")
     .update(
-      `${input.contactId}|${input.text}|${input.createdAt}`
+      `${input.contactId}|${input.contentId}|${input.text}`
     )
     .digest("hex")
     .slice(0, 24);
@@ -113,6 +113,85 @@ function buildManyChatLinkNote(
   ]
     .filter(Boolean)
     .join(" • ");
+}
+
+async function linkRecentMatchingPendingItem(input: {
+  platform: string;
+  commentText: string;
+  displayName: string | null;
+  username: string | null;
+  contactId: string;
+  inboxUrl: string | null;
+}) {
+  if (
+    !input.contactId ||
+    (!input.displayName && !input.username)
+  ) {
+    return null;
+  }
+
+  const rows =
+    (await autoReplySupabaseRequest(
+      `/rest/v1/social_comments?platform=eq.${encodeURIComponent(
+        input.platform
+      )}&status=in.(PENDING_APPROVAL,AI_DRAFTED)&comment_text=eq.${encodeURIComponent(
+        input.commentText
+      )}&select=id,status,user_display_name,username,created_at&order=created_at.desc&limit=20`
+    )) as Array<{
+      id: string;
+      status: string;
+      user_display_name: string | null;
+      username: string | null;
+      created_at: string;
+    }>;
+
+  const normalizedName =
+    input.displayName?.trim().toLowerCase() || null;
+
+  const normalizedUsername =
+    input.username?.trim().toLowerCase() || null;
+
+  const match = rows.find((row) => {
+    const rowName =
+      row.user_display_name?.trim().toLowerCase() || null;
+
+    const rowUsername =
+      row.username?.trim().toLowerCase() || null;
+
+    if (
+      normalizedUsername &&
+      rowUsername &&
+      normalizedUsername === rowUsername
+    ) {
+      return true;
+    }
+
+    if (
+      normalizedName &&
+      rowName &&
+      normalizedName === rowName
+    ) {
+      return true;
+    }
+
+    return false;
+  });
+
+  if (!match) {
+    return null;
+  }
+
+  await writeAutoReplyActivity(
+    match.id,
+    "MANYCHAT_CONTACT_LINKED",
+    "ManyChat Collector",
+    buildManyChatLinkNote(
+      input.contactId,
+      input.inboxUrl
+    )
+  );
+
+  return match;
 }
 
 export async function POST(request: NextRequest) {
@@ -189,6 +268,40 @@ export async function POST(request: NextRequest) {
           fullContact.live_chat_url
       ) || null;
 
+    const platformContentId =
+      str(
+        body.platform_content_id ??
+          body.content_id ??
+          body.post_id
+      );
+
+    /*
+      IMPORTANT:
+      Before creating any new record, try to attach this ManyChat contact
+      to the existing pending approval item that has the same text + person.
+      This repairs Phase-1 records created before durable contact linking.
+    */
+    const relinked =
+      await linkRecentMatchingPendingItem({
+        platform,
+        commentText,
+        displayName,
+        username,
+        contactId,
+        inboxUrl
+      });
+
+    if (relinked) {
+      return NextResponse.json({
+        ok: true,
+        relinked: true,
+        duplicate: true,
+        commentId: relinked.id,
+        status: relinked.status,
+        contactLinked: true
+      });
+    }
+
     const platformCommentId =
       str(
         body.platform_comment_id ??
@@ -197,8 +310,8 @@ export async function POST(request: NextRequest) {
       ) ||
       `manychat-${contactId || "unknown"}-${fallbackEventId({
         contactId: contactId || "unknown",
-        text: commentText,
-        createdAt
+        contentId: platformContentId || "direct-message",
+        text: commentText
       })}`;
 
     const existing = await findExisting(
@@ -212,7 +325,10 @@ export async function POST(request: NextRequest) {
           existing.id,
           "MANYCHAT_CONTACT_LINKED",
           "ManyChat Collector",
-          buildManyChatLinkNote(contactId, inboxUrl)
+          buildManyChatLinkNote(
+            contactId,
+            inboxUrl
+          )
         );
       }
 
@@ -250,11 +366,7 @@ export async function POST(request: NextRequest) {
               str(body.account_key) || "indomobil-emotor",
             platform_comment_id: platformCommentId,
             platform_content_id:
-              str(
-                body.platform_content_id ??
-                  body.content_id ??
-                  body.post_id
-              ) || null,
+              platformContentId || null,
             username,
             user_display_name: displayName,
             comment_text: commentText,
