@@ -33,6 +33,7 @@ type CommentRow = {
   id: string;
   platform: string;
   status: string;
+  platform_comment_id: string;
 };
 
 type ReplyRow = {
@@ -46,7 +47,7 @@ async function getDispatchContext(commentId: string) {
     autoReplySupabaseRequest(
       `/rest/v1/social_comments?id=eq.${encodeURIComponent(
         commentId
-      )}&select=id,platform,status&limit=1`
+      )}&select=id,platform,status,platform_comment_id&limit=1`
     ) as Promise<CommentRow[]>,
     autoReplySupabaseRequest(
       `/rest/v1/social_comment_replies?comment_id=eq.${encodeURIComponent(
@@ -56,7 +57,7 @@ async function getDispatchContext(commentId: string) {
     autoReplySupabaseRequest(
       `/rest/v1/social_comment_activity?comment_id=eq.${encodeURIComponent(
         commentId
-      )}&select=action,note,created_at&order=created_at.desc&limit=30`
+      )}&select=action,note,created_at&order=created_at.desc&limit=50`
     ) as Promise<
       Array<{
         action: string;
@@ -77,7 +78,8 @@ function extractManyChatContactId(
   activity: Array<{
     action: string;
     note: string | null;
-  }>
+  }>,
+  platformCommentId?: string | null
 ) {
   for (const item of activity) {
     const note = item.note || "";
@@ -87,6 +89,16 @@ function extractManyChatContactId(
 
     if (match?.[1]) {
       return match[1];
+    }
+  }
+
+  if (platformCommentId) {
+    const fallback = platformCommentId.match(
+      /^manychat-([0-9]+)-/i
+    );
+
+    if (fallback?.[1]) {
+      return fallback[1];
     }
   }
 
@@ -154,12 +166,8 @@ export async function POST(
 
   if (!authenticated) {
     return NextResponse.json(
-      {
-        error: "Unauthorized"
-      },
-      {
-        status: 401
-      }
+      { error: "Unauthorized" },
+      { status: 401 }
     );
   }
 
@@ -176,19 +184,13 @@ export async function POST(
           error:
             "commentId and action are required."
         },
-        {
-          status: 400
-        }
+        { status: 400 }
       );
     }
 
-    const actor =
-      "Dashboard User";
+    const actor = "Dashboard User";
 
-    if (
-      body.action ===
-      "approve"
-    ) {
+    if (body.action === "approve") {
       const finalReply =
         body.finalReply?.trim();
 
@@ -198,9 +200,7 @@ export async function POST(
             error:
               "Reply text cannot be empty."
           },
-          {
-            status: 400
-          }
+          { status: 400 }
         );
       }
 
@@ -215,21 +215,16 @@ export async function POST(
             error:
               "Comment record was not found."
           },
-          {
-            status: 404
-          }
+          { status: 404 }
         );
       }
 
-      if (
-        context.reply?.sent_at
-      ) {
+      if (context.reply?.sent_at) {
         return NextResponse.json({
           ok: true,
           alreadySent: true,
           action: "approve",
-          commentId:
-            body.commentId
+          commentId: body.commentId
         });
       }
 
@@ -242,26 +237,23 @@ export async function POST(
             error:
               `ManyChat dispatcher currently supports Instagram only. Platform: ${context.comment.platform}`
           },
-          {
-            status: 400
-          }
+          { status: 400 }
         );
       }
 
       const manyChatContactId =
         extractManyChatContactId(
-          context.activity
+          context.activity,
+          context.comment.platform_comment_id
         );
 
       if (!manyChatContactId) {
         return NextResponse.json(
           {
             error:
-              "ManyChat contact ID was not found for this item. Re-ingest the test contact through the ManyChat inbound endpoint first."
+              "ManyChat contact ID is still missing. Run the same contact through the ManyChat External Request again after installing the contact-link fix."
           },
-          {
-            status: 400
-          }
+          { status: 400 }
         );
       }
 
@@ -272,22 +264,15 @@ export async function POST(
         {
           method: "PATCH",
           headers: {
-            Prefer:
-              "return=minimal"
+            Prefer: "return=minimal"
           },
-          body:
-            JSON.stringify({
-              final_reply:
-                finalReply,
-              approved_by:
-                actor,
-              approved_at:
-                new Date().toISOString(),
-              error_message:
-                null,
-              updated_at:
-                new Date().toISOString()
-            })
+          body: JSON.stringify({
+            final_reply: finalReply,
+            approved_by: actor,
+            approved_at: new Date().toISOString(),
+            error_message: null,
+            updated_at: new Date().toISOString()
+          })
         }
       );
 
@@ -298,16 +283,12 @@ export async function POST(
         {
           method: "PATCH",
           headers: {
-            Prefer:
-              "return=minimal"
+            Prefer: "return=minimal"
           },
-          body:
-            JSON.stringify({
-              status:
-                "APPROVED",
-              updated_at:
-                new Date().toISOString()
-            })
+          body: JSON.stringify({
+            status: "APPROVED",
+            updated_at: new Date().toISOString()
+          })
         }
       );
 
@@ -340,9 +321,7 @@ export async function POST(
             error:
               `Approved, but ManyChat send failed: ${message}`
           },
-          {
-            status: 502
-          }
+          { status: 502 }
         );
       }
 
@@ -356,18 +335,13 @@ export async function POST(
         {
           method: "PATCH",
           headers: {
-            Prefer:
-              "return=minimal"
+            Prefer: "return=minimal"
           },
-          body:
-            JSON.stringify({
-              sent_at:
-                sentAt,
-              error_message:
-                null,
-              updated_at:
-                sentAt
-            })
+          body: JSON.stringify({
+            sent_at: sentAt,
+            error_message: null,
+            updated_at: sentAt
+          })
         }
       );
 
@@ -381,35 +355,24 @@ export async function POST(
       return NextResponse.json({
         ok: true,
         sent: true,
-        action:
-          body.action,
-        commentId:
-          body.commentId,
+        action: body.action,
+        commentId: body.commentId,
         sentAt
       });
     }
 
-    if (
-      body.action ===
-      "reject"
-    ) {
+    if (body.action === "reject") {
       await autoReplySupabaseRequest(
         `/rest/v1/social_comments?id=eq.${encodeURIComponent(
           body.commentId
         )}`,
         {
           method: "PATCH",
-          headers: {
-            Prefer:
-              "return=minimal"
-          },
-          body:
-            JSON.stringify({
-              status:
-                "REJECTED",
-              updated_at:
-                new Date().toISOString()
-            })
+          headers: { Prefer: "return=minimal" },
+          body: JSON.stringify({
+            status: "REJECTED",
+            updated_at: new Date().toISOString()
+          })
         }
       );
 
@@ -419,18 +382,13 @@ export async function POST(
         )}`,
         {
           method: "PATCH",
-          headers: {
-            Prefer:
-              "return=minimal"
-          },
-          body:
-            JSON.stringify({
-              rejected_reason:
-                body.note ||
-                "Rejected by reviewer.",
-              updated_at:
-                new Date().toISOString()
-            })
+          headers: { Prefer: "return=minimal" },
+          body: JSON.stringify({
+            rejected_reason:
+              body.note ||
+              "Rejected by reviewer.",
+            updated_at: new Date().toISOString()
+          })
         }
       );
 
@@ -443,27 +401,18 @@ export async function POST(
       );
     }
 
-    if (
-      body.action ===
-      "escalate"
-    ) {
+    if (body.action === "escalate") {
       await autoReplySupabaseRequest(
         `/rest/v1/social_comments?id=eq.${encodeURIComponent(
           body.commentId
         )}`,
         {
           method: "PATCH",
-          headers: {
-            Prefer:
-              "return=minimal"
-          },
-          body:
-            JSON.stringify({
-              status:
-                "ESCALATED",
-              updated_at:
-                new Date().toISOString()
-            })
+          headers: { Prefer: "return=minimal" },
+          body: JSON.stringify({
+            status: "ESCALATED",
+            updated_at: new Date().toISOString()
+          })
         }
       );
 
@@ -476,27 +425,18 @@ export async function POST(
       );
     }
 
-    if (
-      body.action ===
-      "ignore"
-    ) {
+    if (body.action === "ignore") {
       await autoReplySupabaseRequest(
         `/rest/v1/social_comments?id=eq.${encodeURIComponent(
           body.commentId
         )}`,
         {
           method: "PATCH",
-          headers: {
-            Prefer:
-              "return=minimal"
-          },
-          body:
-            JSON.stringify({
-              status:
-                "IGNORED",
-              updated_at:
-                new Date().toISOString()
-            })
+          headers: { Prefer: "return=minimal" },
+          body: JSON.stringify({
+            status: "IGNORED",
+            updated_at: new Date().toISOString()
+          })
         }
       );
 
@@ -511,10 +451,8 @@ export async function POST(
 
     return NextResponse.json({
       ok: true,
-      action:
-        body.action,
-      commentId:
-        body.commentId
+      action: body.action,
+      commentId: body.commentId
     });
   } catch (error) {
     console.error(
@@ -529,9 +467,7 @@ export async function POST(
             ? error.message
             : "Unable to update comment."
       },
-      {
-        status: 500
-      }
+      { status: 500 }
     );
   }
 }

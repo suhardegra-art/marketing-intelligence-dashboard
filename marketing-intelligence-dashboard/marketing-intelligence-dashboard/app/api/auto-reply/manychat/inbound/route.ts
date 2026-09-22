@@ -33,6 +33,7 @@ function obj(value: unknown): Record<string, any> {
   if (typeof value === "string") {
     try {
       const parsed = JSON.parse(value);
+
       if (
         parsed &&
         typeof parsed === "object" &&
@@ -83,7 +84,7 @@ function fallbackEventId(input: {
       `${input.contactId}|${input.text}|${input.createdAt}`
     )
     .digest("hex")
-    .slice(0, 32);
+    .slice(0, 24);
 }
 
 async function findExisting(
@@ -100,6 +101,18 @@ async function findExisting(
     )) as Array<{ id: string; status: string }>;
 
   return rows[0] || null;
+}
+
+function buildManyChatLinkNote(
+  contactId: string,
+  inboxUrl: string | null
+) {
+  return [
+    `ManyChat contact: ${contactId}`,
+    inboxUrl ? `Inbox: ${inboxUrl}` : null
+  ]
+    .filter(Boolean)
+    .join(" • ");
 }
 
 export async function POST(request: NextRequest) {
@@ -170,13 +183,19 @@ export async function POST(request: NextRequest) {
           fullContact.last_interaction
       ) || new Date().toISOString();
 
+    const inboxUrl =
+      str(
+        body.inbox_url ??
+          fullContact.live_chat_url
+      ) || null;
+
     const platformCommentId =
       str(
         body.platform_comment_id ??
           body.comment_id ??
           body.event_id
       ) ||
-      `manychat-${fallbackEventId({
+      `manychat-${contactId || "unknown"}-${fallbackEventId({
         contactId: contactId || "unknown",
         text: commentText,
         createdAt
@@ -188,11 +207,21 @@ export async function POST(request: NextRequest) {
     );
 
     if (existing) {
+      if (contactId) {
+        await writeAutoReplyActivity(
+          existing.id,
+          "MANYCHAT_CONTACT_LINKED",
+          "ManyChat Collector",
+          buildManyChatLinkNote(contactId, inboxUrl)
+        );
+      }
+
       return NextResponse.json({
         ok: true,
         duplicate: true,
         commentId: existing.id,
-        status: existing.status
+        status: existing.status,
+        contactLinked: Boolean(contactId)
       });
     }
 
@@ -272,12 +301,6 @@ export async function POST(request: NextRequest) {
       }
     );
 
-    const inboxUrl =
-      str(
-        body.inbox_url ??
-          fullContact.live_chat_url
-      ) || null;
-
     await writeAutoReplyActivity(
       commentId,
       "AI_DRAFTED",
@@ -302,7 +325,8 @@ export async function POST(request: NextRequest) {
       status: "PENDING_APPROVAL",
       approvalRequired: true,
       draftGenerated: true,
-      needsConfirmation: draft.needsConfirmation
+      needsConfirmation: draft.needsConfirmation,
+      contactLinked: Boolean(contactId)
     });
   } catch (error) {
     console.error(
