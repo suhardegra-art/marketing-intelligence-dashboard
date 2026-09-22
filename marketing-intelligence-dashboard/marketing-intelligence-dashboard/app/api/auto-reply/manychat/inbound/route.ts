@@ -205,13 +205,29 @@ export async function POST(request: NextRequest) {
 
     const body = (await request.json()) as Payload;
 
+    /*
+      ManyChat "Add Full Contact Data" sends the contact JSON directly
+      as the TOP-LEVEL request body. Support both that shape and wrapped shapes.
+    */
+    const directContactBody =
+      body.id ||
+      body.key ||
+      body.last_input_text ||
+      body.live_chat_url
+        ? body
+        : null;
+
     const fullContact = obj(
       body.full_contact_data ??
         body.contact ??
-        body.contact_data
+        body.contact_data ??
+        directContactBody
     );
 
-    const customFields = obj(fullContact.custom_fields);
+    const customFields = obj(
+      body.custom_fields ??
+        fullContact.custom_fields
+    );
 
     const platform =
       str(body.platform).toLowerCase() || "instagram";
@@ -220,6 +236,7 @@ export async function POST(request: NextRequest) {
       body.manychat_contact_id ??
         body.contact_id ??
         body.subscriber_id ??
+        body.id ??
         fullContact.id
     );
 
@@ -227,12 +244,14 @@ export async function POST(request: NextRequest) {
       str(
         body.display_name ??
           body.name ??
-          fullContact.name
+          fullContact.name ??
+          fullContact.first_name
       ) || null;
 
     const username =
       str(
         body.username ??
+          body.instagram_username ??
           customFields.instagram_username ??
           customFields.username
       ) || null;
@@ -259,12 +278,14 @@ export async function POST(request: NextRequest) {
         body.comment_created_at ??
           body.created_at ??
           body.timestamp ??
+          body.last_interaction ??
           fullContact.last_interaction
       ) || new Date().toISOString();
 
     const inboxUrl =
       str(
         body.inbox_url ??
+          body.live_chat_url ??
           fullContact.live_chat_url
       ) || null;
 
@@ -276,10 +297,8 @@ export async function POST(request: NextRequest) {
       );
 
     /*
-      IMPORTANT:
-      Before creating any new record, try to attach this ManyChat contact
-      to the existing pending approval item that has the same text + person.
-      This repairs Phase-1 records created before durable contact linking.
+      Repair older Phase-1 records:
+      match same pending text + same contact name/username, then link contact ID.
     */
     const relinked =
       await linkRecentMatchingPendingItem({
@@ -298,7 +317,8 @@ export async function POST(request: NextRequest) {
         duplicate: true,
         commentId: relinked.id,
         status: relinked.status,
-        contactLinked: true
+        contactLinked: Boolean(contactId),
+        manyChatContactId: contactId || null
       });
     }
 
@@ -337,7 +357,8 @@ export async function POST(request: NextRequest) {
         duplicate: true,
         commentId: existing.id,
         status: existing.status,
-        contactLinked: Boolean(contactId)
+        contactLinked: Boolean(contactId),
+        manyChatContactId: contactId || null
       });
     }
 
@@ -438,7 +459,8 @@ export async function POST(request: NextRequest) {
       approvalRequired: true,
       draftGenerated: true,
       needsConfirmation: draft.needsConfirmation,
-      contactLinked: Boolean(contactId)
+      contactLinked: Boolean(contactId),
+      manyChatContactId: contactId || null
     });
   } catch (error) {
     console.error(
