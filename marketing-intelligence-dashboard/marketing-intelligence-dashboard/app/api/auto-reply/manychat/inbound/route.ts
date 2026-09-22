@@ -233,10 +233,13 @@ export async function POST(request: NextRequest) {
               str(body.comment_url) || null,
             comment_created_at: createdAt,
             intent: draft.intent,
-            sentiment: draft.sentiment,
-            priority: draft.priority,
+            sentiment: draft.sentiment.toLowerCase(),
+            priority:
+              draft.priority === "HIGH"
+                ? "urgent"
+                : "normal",
             ai_confidence: draft.confidence,
-            status: "AI_DRAFTED",
+            status: "PENDING_APPROVAL",
             updated_at: new Date().toISOString()
           })
         }
@@ -296,7 +299,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       ok: true,
       commentId,
-      status: "AI_DRAFTED",
+      status: "PENDING_APPROVAL",
       approvalRequired: true,
       draftGenerated: true,
       needsConfirmation: draft.needsConfirmation
