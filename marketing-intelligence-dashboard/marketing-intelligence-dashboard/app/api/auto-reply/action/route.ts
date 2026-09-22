@@ -12,6 +12,10 @@ import {
   writeAutoReplyActivity
 } from "@/lib/auto-reply-comments";
 
+import {
+  sendManyChatInstagramText
+} from "@/lib/manychat";
+
 type ActionName =
   | "approve"
   | "reject"
@@ -24,6 +28,115 @@ type RequestBody = {
   finalReply?: string;
   note?: string;
 };
+
+type CommentRow = {
+  id: string;
+  platform: string;
+  status: string;
+};
+
+type ReplyRow = {
+  id: string;
+  final_reply: string | null;
+  sent_at: string | null;
+};
+
+async function getDispatchContext(commentId: string) {
+  const [comments, replies, activity] = await Promise.all([
+    autoReplySupabaseRequest(
+      `/rest/v1/social_comments?id=eq.${encodeURIComponent(
+        commentId
+      )}&select=id,platform,status&limit=1`
+    ) as Promise<CommentRow[]>,
+    autoReplySupabaseRequest(
+      `/rest/v1/social_comment_replies?comment_id=eq.${encodeURIComponent(
+        commentId
+      )}&select=id,final_reply,sent_at&order=updated_at.desc&limit=1`
+    ) as Promise<ReplyRow[]>,
+    autoReplySupabaseRequest(
+      `/rest/v1/social_comment_activity?comment_id=eq.${encodeURIComponent(
+        commentId
+      )}&select=action,note,created_at&order=created_at.desc&limit=30`
+    ) as Promise<
+      Array<{
+        action: string;
+        note: string | null;
+        created_at: string;
+      }>
+    >
+  ]);
+
+  return {
+    comment: comments[0] || null,
+    reply: replies[0] || null,
+    activity
+  };
+}
+
+function extractManyChatContactId(
+  activity: Array<{
+    action: string;
+    note: string | null;
+  }>
+) {
+  for (const item of activity) {
+    const note = item.note || "";
+    const match = note.match(
+      /ManyChat contact:\s*([0-9]+)/i
+    );
+
+    if (match?.[1]) {
+      return match[1];
+    }
+  }
+
+  return null;
+}
+
+async function markSendFailure(
+  commentId: string,
+  errorMessage: string
+) {
+  await Promise.all([
+    autoReplySupabaseRequest(
+      `/rest/v1/social_comment_replies?comment_id=eq.${encodeURIComponent(
+        commentId
+      )}`,
+      {
+        method: "PATCH",
+        headers: {
+          Prefer: "return=minimal"
+        },
+        body: JSON.stringify({
+          error_message: errorMessage,
+          updated_at: new Date().toISOString()
+        })
+      }
+    ),
+    autoReplySupabaseRequest(
+      `/rest/v1/social_comments?id=eq.${encodeURIComponent(
+        commentId
+      )}`,
+      {
+        method: "PATCH",
+        headers: {
+          Prefer: "return=minimal"
+        },
+        body: JSON.stringify({
+          status: "PENDING_APPROVAL",
+          updated_at: new Date().toISOString()
+        })
+      }
+    )
+  ]);
+
+  await writeAutoReplyActivity(
+    commentId,
+    "SEND_FAILED",
+    "ManyChat Dispatcher",
+    errorMessage
+  );
+}
 
 export async function POST(
   request: NextRequest
@@ -91,6 +204,67 @@ export async function POST(
         );
       }
 
+      const context =
+        await getDispatchContext(
+          body.commentId
+        );
+
+      if (!context.comment) {
+        return NextResponse.json(
+          {
+            error:
+              "Comment record was not found."
+          },
+          {
+            status: 404
+          }
+        );
+      }
+
+      if (
+        context.reply?.sent_at
+      ) {
+        return NextResponse.json({
+          ok: true,
+          alreadySent: true,
+          action: "approve",
+          commentId:
+            body.commentId
+        });
+      }
+
+      if (
+        context.comment.platform !==
+        "instagram"
+      ) {
+        return NextResponse.json(
+          {
+            error:
+              `ManyChat dispatcher currently supports Instagram only. Platform: ${context.comment.platform}`
+          },
+          {
+            status: 400
+          }
+        );
+      }
+
+      const manyChatContactId =
+        extractManyChatContactId(
+          context.activity
+        );
+
+      if (!manyChatContactId) {
+        return NextResponse.json(
+          {
+            error:
+              "ManyChat contact ID was not found for this item. Re-ingest the test contact through the ManyChat inbound endpoint first."
+          },
+          {
+            status: 400
+          }
+        );
+      }
+
       await autoReplySupabaseRequest(
         `/rest/v1/social_comment_replies?comment_id=eq.${encodeURIComponent(
           body.commentId
@@ -109,6 +283,8 @@ export async function POST(
                 actor,
               approved_at:
                 new Date().toISOString(),
+              error_message:
+                null,
               updated_at:
                 new Date().toISOString()
             })
@@ -140,8 +316,77 @@ export async function POST(
         "APPROVED",
         actor,
         body.note ||
-          "Reply approved and queued for dispatcher."
+          "Exact reply approved for immediate ManyChat dispatch."
       );
+
+      try {
+        await sendManyChatInstagramText(
+          manyChatContactId,
+          finalReply
+        );
+      } catch (sendError) {
+        const message =
+          sendError instanceof Error
+            ? sendError.message
+            : "Unable to send through ManyChat.";
+
+        await markSendFailure(
+          body.commentId,
+          message
+        );
+
+        return NextResponse.json(
+          {
+            error:
+              `Approved, but ManyChat send failed: ${message}`
+          },
+          {
+            status: 502
+          }
+        );
+      }
+
+      const sentAt =
+        new Date().toISOString();
+
+      await autoReplySupabaseRequest(
+        `/rest/v1/social_comment_replies?comment_id=eq.${encodeURIComponent(
+          body.commentId
+        )}`,
+        {
+          method: "PATCH",
+          headers: {
+            Prefer:
+              "return=minimal"
+          },
+          body:
+            JSON.stringify({
+              sent_at:
+                sentAt,
+              error_message:
+                null,
+              updated_at:
+                sentAt
+            })
+        }
+      );
+
+      await writeAutoReplyActivity(
+        body.commentId,
+        "SENT",
+        "ManyChat Dispatcher",
+        `Approved reply sent to ManyChat contact ${manyChatContactId}.`
+      );
+
+      return NextResponse.json({
+        ok: true,
+        sent: true,
+        action:
+          body.action,
+        commentId:
+          body.commentId,
+        sentAt
+      });
     }
 
     if (

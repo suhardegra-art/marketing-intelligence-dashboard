@@ -23,43 +23,17 @@ type Filter =
 function platformLabel(
   platform: string
 ) {
-  if (
-    platform ===
-    "instagram"
-  ) {
-    return "Instagram";
-  }
-
-  if (
-    platform ===
-    "youtube"
-  ) {
-    return "YouTube";
-  }
-
-  if (
-    platform ===
-    "tiktok"
-  ) {
-    return "TikTok";
-  }
-
-  if (
-    platform ===
-    "facebook"
-  ) {
-    return "Facebook";
-  }
-
+  if (platform === "instagram") return "Instagram";
+  if (platform === "youtube") return "YouTube";
+  if (platform === "tiktok") return "TikTok";
+  if (platform === "facebook") return "Facebook";
   return platform;
 }
 
 function formatDateTime(
   value: string | null
 ) {
-  if (!value) {
-    return "—";
-  }
+  if (!value) return "—";
 
   return new Intl.DateTimeFormat(
     "en-GB",
@@ -70,9 +44,7 @@ function formatDateTime(
       hour: "2-digit",
       minute: "2-digit"
     }
-  ).format(
-    new Date(value)
-  );
+  ).format(new Date(value));
 }
 
 export default function AutoReplyApprovalInbox({
@@ -81,57 +53,36 @@ export default function AutoReplyApprovalInbox({
   const [filter, setFilter] =
     useState<Filter>("all");
 
-  const [
-    drafts,
-    setDrafts
-  ] = useState<
-    Record<string, string>
-  >(
-    Object.fromEntries(
-      comments.map(
-        (comment) => [
-          comment.id,
-          comment.reply
-            ?.finalReply ||
-            comment.reply
-              ?.aiDraft ||
-            ""
-        ]
+  const [drafts, setDrafts] =
+    useState<Record<string, string>>(
+      Object.fromEntries(
+        comments.map(
+          (comment) => [
+            comment.id,
+            comment.reply?.finalReply ||
+              comment.reply?.aiDraft ||
+              ""
+          ]
+        )
       )
-    )
+    );
+
+  const [loadingId, setLoadingId] =
+    useState<string | null>(null);
+
+  const [error, setError] =
+    useState<string | null>(null);
+
+  const filtered = useMemo(
+    () =>
+      filter === "all"
+        ? comments
+        : comments.filter(
+            (comment) =>
+              comment.platform === filter
+          ),
+    [comments, filter]
   );
-
-  const [
-    loadingId,
-    setLoadingId
-  ] =
-    useState<string | null>(
-      null
-    );
-
-  const [
-    error,
-    setError
-  ] =
-    useState<string | null>(
-      null
-    );
-
-  const filtered =
-    useMemo(
-      () =>
-        filter === "all"
-          ? comments
-          : comments.filter(
-              (comment) =>
-                comment.platform ===
-                filter
-            ),
-      [
-        comments,
-        filter
-      ]
-    );
 
   async function act(
     commentId: string,
@@ -141,9 +92,17 @@ export default function AutoReplyApprovalInbox({
       | "escalate"
       | "ignore"
   ) {
-    setLoadingId(
-      commentId
-    );
+    if (action === "approve") {
+      const confirmed = window.confirm(
+        "Send this exact approved reply through ManyChat now?"
+      );
+
+      if (!confirmed) {
+        return;
+      }
+    }
+
+    setLoadingId(commentId);
     setError(null);
 
     try {
@@ -161,9 +120,7 @@ export default function AutoReplyApprovalInbox({
                 commentId,
                 action,
                 finalReply:
-                  drafts[
-                    commentId
-                  ] || ""
+                  drafts[commentId] || ""
               })
           }
         );
@@ -186,9 +143,7 @@ export default function AutoReplyApprovalInbox({
           : "Unable to update comment."
       );
     } finally {
-      setLoadingId(
-        null
-      );
+      setLoadingId(null);
     }
   }
 
@@ -203,17 +158,13 @@ export default function AutoReplyApprovalInbox({
       <div
         className="panel-header"
         style={{
-          alignItems:
-            "flex-start"
+          alignItems: "flex-start"
         }}
       >
         <div>
-          <h3>
-            Approval Inbox
-          </h3>
-
+          <h3>Approval Inbox</h3>
           <p>
-            Review, edit, approve, reject, or escalate every AI-generated reply.
+            Review and edit the AI draft. Approve sends the exact text immediately through ManyChat.
           </p>
         </div>
 
@@ -225,34 +176,15 @@ export default function AutoReplyApprovalInbox({
           }}
         >
           {[
-            [
-              "all",
-              "All"
-            ],
-            [
-              "instagram",
-              "Instagram"
-            ],
-            [
-              "tiktok",
-              "TikTok"
-            ],
-            [
-              "youtube",
-              "YouTube"
-            ],
-            [
-              "facebook",
-              "Facebook"
-            ]
+            ["all", "All"],
+            ["instagram", "Instagram"],
+            ["tiktok", "TikTok"],
+            ["youtube", "YouTube"],
+            ["facebook", "Facebook"]
           ].map(
-            ([
-              value,
-              label
-            ]) => {
+            ([value, label]) => {
               const active =
-                filter ===
-                value;
+                filter === value;
 
               return (
                 <button
@@ -265,27 +197,20 @@ export default function AutoReplyApprovalInbox({
                   }
                   style={{
                     minHeight: 32,
-                    borderRadius:
-                      8,
-                    border:
-                      active
-                        ? "1px solid #5368e8"
-                        : "1px solid #e4e7ef",
-                    background:
-                      active
-                        ? "#eef1ff"
-                        : "#fff",
-                    color:
-                      active
-                        ? "#4059d7"
-                        : "#7a839d",
-                    padding:
-                      "0 11px",
+                    borderRadius: 8,
+                    border: active
+                      ? "1px solid #5368e8"
+                      : "1px solid #e4e7ef",
+                    background: active
+                      ? "#eef1ff"
+                      : "#fff",
+                    color: active
+                      ? "#4059d7"
+                      : "#7a839d",
+                    padding: "0 11px",
                     fontSize: 10,
-                    fontWeight:
-                      800,
-                    cursor:
-                      "pointer"
+                    fontWeight: 800,
+                    cursor: "pointer"
                   }}
                 >
                   {label}
@@ -314,8 +239,7 @@ export default function AutoReplyApprovalInbox({
         </div>
       ) : null}
 
-      {filtered.length ===
-      0 ? (
+      {filtered.length === 0 ? (
         <div
           style={{
             minHeight: 210,
@@ -325,10 +249,8 @@ export default function AutoReplyApprovalInbox({
             background:
               "#fbfcff",
             display: "flex",
-            alignItems:
-              "center",
-            justifyContent:
-              "center",
+            alignItems: "center",
+            justifyContent: "center",
             textAlign: "center",
             padding: 22
           }}
@@ -336,10 +258,8 @@ export default function AutoReplyApprovalInbox({
           <div>
             <strong
               style={{
-                display:
-                  "block",
-                color:
-                  "#344054",
+                display: "block",
+                color: "#344054",
                 fontSize: 13,
                 marginBottom: 5
               }}
@@ -349,12 +269,11 @@ export default function AutoReplyApprovalInbox({
 
             <span
               style={{
-                color:
-                  "#8b93a7",
+                color: "#8b93a7",
                 fontSize: 11
               }}
             >
-              Comments will appear here after the n8n collector and AI draft workflow are connected.
+              New ManyChat events will appear here after Vercel creates the AI draft.
             </span>
           </div>
         </div>
@@ -368,62 +287,48 @@ export default function AutoReplyApprovalInbox({
           {filtered.map(
             (comment) => {
               const busy =
-                loadingId ===
-                comment.id;
+                loadingId === comment.id;
 
               const confidence =
-                comment.reply
-                  ?.aiConfidence ??
+                comment.reply?.aiConfidence ??
                 comment.aiConfidence;
 
               return (
                 <article
-                  key={
-                    comment.id
-                  }
+                  key={comment.id}
                   style={{
                     border:
                       "1px solid #e5e9f2",
-                    borderRadius:
-                      14,
+                    borderRadius: 14,
                     padding: 15,
-                    background:
-                      "#fff"
+                    background: "#fff"
                   }}
                 >
                   <div
                     style={{
-                      display:
-                        "flex",
+                      display: "flex",
                       justifyContent:
                         "space-between",
                       gap: 12,
                       alignItems:
                         "flex-start",
-                      flexWrap:
-                        "wrap",
-                      marginBottom:
-                        12
+                      flexWrap: "wrap",
+                      marginBottom: 12
                     }}
                   >
                     <div>
                       <div
                         style={{
-                          display:
-                            "flex",
+                          display: "flex",
                           gap: 7,
-                          alignItems:
-                            "center",
-                          flexWrap:
-                            "wrap"
+                          alignItems: "center",
+                          flexWrap: "wrap"
                         }}
                       >
                         <strong
                           style={{
-                            color:
-                              "#27324a",
-                            fontSize:
-                              12
+                            color: "#27324a",
+                            fontSize: 12
                           }}
                         >
                           {platformLabel(
@@ -433,80 +338,55 @@ export default function AutoReplyApprovalInbox({
 
                         <span
                           style={{
-                            color:
-                              "#8b93a7",
-                            fontSize:
-                              10
+                            color: "#8b93a7",
+                            fontSize: 10
                           }}
                         >
-                          @
-                          {comment.username ||
-                            "unknown"}
+                          @{comment.username || "unknown"}
                         </span>
 
                         {comment.intent ? (
                           <span
                             style={{
-                              borderRadius:
-                                999,
-                              padding:
-                                "4px 7px",
-                              background:
-                                "#eef1ff",
-                              color:
-                                "#5368e8",
-                              fontSize:
-                                8,
-                              fontWeight:
-                                800
+                              borderRadius: 999,
+                              padding: "4px 7px",
+                              background: "#eef1ff",
+                              color: "#5368e8",
+                              fontSize: 8,
+                              fontWeight: 800
                             }}
                           >
-                            {
-                              comment.intent
-                            }
+                            {comment.intent}
                           </span>
                         ) : null}
 
-                        {confidence !==
-                        null ? (
+                        {confidence !== null ? (
                           <span
                             style={{
-                              borderRadius:
-                                999,
-                              padding:
-                                "4px 7px",
+                              borderRadius: 999,
+                              padding: "4px 7px",
                               background:
-                                confidence >=
-                                80
+                                confidence >= 80
                                   ? "#ecfdf3"
                                   : "#fff7ed",
                               color:
-                                confidence >=
-                                80
+                                confidence >= 80
                                   ? "#067647"
                                   : "#b54708",
-                              fontSize:
-                                8,
-                              fontWeight:
-                                800
+                              fontSize: 8,
+                              fontWeight: 800
                             }}
                           >
-                            AI{" "}
-                            {confidence.toFixed(
-                              0
-                            )}
-                            %
+                            AI {confidence.toFixed(0)}%
                           </span>
                         ) : null}
                       </div>
 
                       <span
                         style={{
-                          display:
-                            "block",
+                          display: "block",
                           marginTop: 5,
-                          color:
-                            "#98a2b3",
+                          color: "#98a2b3",
                           fontSize: 9
                         }}
                       >
@@ -519,65 +399,47 @@ export default function AutoReplyApprovalInbox({
 
                     <span
                       style={{
-                        borderRadius:
-                          999,
-                        padding:
-                          "5px 8px",
-                        background:
-                          "#fff7ed",
-                        color:
-                          "#b54708",
+                        borderRadius: 999,
+                        padding: "5px 8px",
+                        background: "#fff7ed",
+                        color: "#b54708",
                         fontSize: 8,
-                        fontWeight:
-                          800
+                        fontWeight: 800
                       }}
                     >
-                      {
-                        comment.status
-                      }
+                      {comment.status}
                     </span>
                   </div>
 
                   <div
                     style={{
-                      borderRadius:
-                        11,
-                      background:
-                        "#f8f9fd",
+                      borderRadius: 11,
+                      background: "#f8f9fd",
                       padding: 12,
-                      marginBottom:
-                        12
+                      marginBottom: 12
                     }}
                   >
                     <div
                       style={{
-                        color:
-                          "#8b93a7",
+                        color: "#8b93a7",
                         fontSize: 8,
-                        fontWeight:
-                          900,
-                        letterSpacing:
-                          ".07em",
-                        textTransform:
-                          "uppercase",
-                        marginBottom:
-                          5
+                        fontWeight: 900,
+                        letterSpacing: ".07em",
+                        textTransform: "uppercase",
+                        marginBottom: 5
                       }}
                     >
-                      Customer Comment
+                      Customer Comment / Message
                     </div>
 
                     <div
                       style={{
-                        color:
-                          "#344054",
+                        color: "#344054",
                         fontSize: 11,
                         lineHeight: 1.6
                       }}
                     >
-                      {
-                        comment.commentText
-                      }
+                      {comment.commentText}
                     </div>
                   </div>
 
@@ -589,62 +451,39 @@ export default function AutoReplyApprovalInbox({
                   >
                     <span
                       style={{
-                        color:
-                          "#7259dc",
+                        color: "#7259dc",
                         fontSize: 8,
-                        fontWeight:
-                          900,
-                        letterSpacing:
-                          ".07em",
-                        textTransform:
-                          "uppercase"
+                        fontWeight: 900,
+                        letterSpacing: ".07em",
+                        textTransform: "uppercase"
                       }}
                     >
-                      AI Suggested Reply — editable before approval
+                      AI Suggested Reply — exact text will be sent after approval
                     </span>
 
                     <textarea
-                      value={
-                        drafts[
-                          comment.id
-                        ] || ""
-                      }
-                      onChange={(
-                        event
-                      ) =>
-                        setDrafts(
-                          (
-                            current
-                          ) => ({
-                            ...current,
-                            [comment.id]:
-                              event
-                                .target
-                                .value
-                          })
-                        )
+                      value={drafts[comment.id] || ""}
+                      onChange={(event) =>
+                        setDrafts((current) => ({
+                          ...current,
+                          [comment.id]:
+                            event.target.value
+                        }))
                       }
                       rows={4}
                       style={{
-                        width:
-                          "100%",
-                        resize:
-                          "vertical",
-                        boxSizing:
-                          "border-box",
+                        width: "100%",
+                        resize: "vertical",
+                        boxSizing: "border-box",
                         border:
                           "1px solid #dce1ef",
-                        borderRadius:
-                          10,
+                        borderRadius: 10,
                         padding: 11,
-                        font:
-                          "inherit",
+                        font: "inherit",
                         fontSize: 11,
                         lineHeight: 1.55,
-                        color:
-                          "#344054",
-                        background:
-                          "#fff"
+                        color: "#344054",
+                        background: "#fff"
                       }}
                     />
                   </label>
@@ -655,50 +494,35 @@ export default function AutoReplyApprovalInbox({
                       justifyContent:
                         "space-between",
                       gap: 10,
-                      flexWrap:
-                        "wrap",
-                      alignItems:
-                        "center",
+                      flexWrap: "wrap",
+                      alignItems: "center",
                       marginTop: 12
                     }}
                   >
                     <div
                       style={{
-                        display:
-                          "flex",
+                        display: "flex",
                         gap: 7,
-                        flexWrap:
-                          "wrap"
+                        flexWrap: "wrap"
                       }}
                     >
                       {comment.commentUrl ? (
                         <a
-                          href={
-                            comment.commentUrl
-                          }
+                          href={comment.commentUrl}
                           target="_blank"
                           rel="noreferrer"
                           style={{
-                            minHeight:
-                              34,
-                            display:
-                              "inline-flex",
-                            alignItems:
-                              "center",
+                            minHeight: 34,
+                            display: "inline-flex",
+                            alignItems: "center",
                             border:
                               "1px solid #e4e7ef",
-                            borderRadius:
-                              9,
-                            padding:
-                              "0 10px",
-                            color:
-                              "#667085",
-                            textDecoration:
-                              "none",
-                            fontSize:
-                              9,
-                            fontWeight:
-                              800
+                            borderRadius: 9,
+                            padding: "0 10px",
+                            color: "#667085",
+                            textDecoration: "none",
+                            fontSize: 9,
+                            fontWeight: 800
                           }}
                         >
                           Open Comment ↗
@@ -707,105 +531,33 @@ export default function AutoReplyApprovalInbox({
 
                       <button
                         type="button"
-                        disabled={
-                          busy
-                        }
+                        disabled={busy}
                         onClick={() =>
-                          act(
-                            comment.id,
-                            "ignore"
-                          )
+                          act(comment.id, "ignore")
                         }
-                        style={{
-                          minHeight:
-                            34,
-                          border:
-                            "1px solid #e4e7ef",
-                          borderRadius:
-                            9,
-                          background:
-                            "#fff",
-                          color:
-                            "#667085",
-                          padding:
-                            "0 10px",
-                          fontSize:
-                            9,
-                          fontWeight:
-                            800,
-                          cursor:
-                            "pointer"
-                        }}
+                        style={secondaryButton}
                       >
                         Ignore
                       </button>
 
                       <button
                         type="button"
-                        disabled={
-                          busy
-                        }
+                        disabled={busy}
                         onClick={() =>
-                          act(
-                            comment.id,
-                            "reject"
-                          )
+                          act(comment.id, "reject")
                         }
-                        style={{
-                          minHeight:
-                            34,
-                          border:
-                            "1px solid #ffd4d4",
-                          borderRadius:
-                            9,
-                          background:
-                            "#fff7f7",
-                          color:
-                            "#b42318",
-                          padding:
-                            "0 10px",
-                          fontSize:
-                            9,
-                          fontWeight:
-                            800,
-                          cursor:
-                            "pointer"
-                        }}
+                        style={rejectButton}
                       >
                         Reject
                       </button>
 
                       <button
                         type="button"
-                        disabled={
-                          busy
-                        }
+                        disabled={busy}
                         onClick={() =>
-                          act(
-                            comment.id,
-                            "escalate"
-                          )
+                          act(comment.id, "escalate")
                         }
-                        style={{
-                          minHeight:
-                            34,
-                          border:
-                            "1px solid #fedf89",
-                          borderRadius:
-                            9,
-                          background:
-                            "#fffaeb",
-                          color:
-                            "#b54708",
-                          padding:
-                            "0 10px",
-                          fontSize:
-                            9,
-                          fontWeight:
-                            800,
-                          cursor:
-                            "pointer"
-                        }}
+                        style={escalateButton}
                       >
                         Escalate
                       </button>
@@ -815,51 +567,32 @@ export default function AutoReplyApprovalInbox({
                       type="button"
                       disabled={
                         busy ||
-                        !(
-                          drafts[
-                            comment.id
-                          ] || ""
-                        ).trim()
+                        !(drafts[comment.id] || "").trim()
                       }
                       onClick={() =>
-                        act(
-                          comment.id,
-                          "approve"
-                        )
+                        act(comment.id, "approve")
                       }
                       style={{
-                        minHeight:
-                          36,
+                        minHeight: 36,
                         border: 0,
-                        borderRadius:
-                          9,
-                        background:
-                          "#4059d7",
-                        color:
-                          "#fff",
-                        padding:
-                          "0 14px",
-                        fontSize:
-                          10,
-                        fontWeight:
-                          900,
-                        cursor:
-                          busy
-                            ? "wait"
-                            : "pointer",
+                        borderRadius: 9,
+                        background: "#4059d7",
+                        color: "#fff",
+                        padding: "0 14px",
+                        fontSize: 10,
+                        fontWeight: 900,
+                        cursor: busy
+                          ? "wait"
+                          : "pointer",
                         opacity:
-                          (
-                            drafts[
-                              comment.id
-                            ] || ""
-                          ).trim()
+                          (drafts[comment.id] || "").trim()
                             ? 1
                             : 0.5
                       }}
                     >
                       {busy
-                        ? "Saving..."
-                        : "✓ Approve & Queue"}
+                        ? "Sending..."
+                        : "✓ Approve & Send"}
                     </button>
                   </div>
                 </article>
@@ -871,3 +604,29 @@ export default function AutoReplyApprovalInbox({
     </section>
   );
 }
+
+const secondaryButton = {
+  minHeight: 34,
+  border: "1px solid #e4e7ef",
+  borderRadius: 9,
+  background: "#fff",
+  color: "#667085",
+  padding: "0 10px",
+  fontSize: 9,
+  fontWeight: 800,
+  cursor: "pointer"
+} as const;
+
+const rejectButton = {
+  ...secondaryButton,
+  border: "1px solid #ffd4d4",
+  background: "#fff7f7",
+  color: "#b42318"
+} as const;
+
+const escalateButton = {
+  ...secondaryButton,
+  border: "1px solid #fedf89",
+  background: "#fffaeb",
+  color: "#b54708"
+} as const;

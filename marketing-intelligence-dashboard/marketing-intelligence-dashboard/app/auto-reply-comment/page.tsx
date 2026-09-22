@@ -36,34 +36,10 @@ function formatDateTime(
 function platformLabel(
   platform: string
 ) {
-  if (
-    platform ===
-    "instagram"
-  ) {
-    return "Instagram";
-  }
-
-  if (
-    platform ===
-    "youtube"
-  ) {
-    return "YouTube";
-  }
-
-  if (
-    platform ===
-    "tiktok"
-  ) {
-    return "TikTok";
-  }
-
-  if (
-    platform ===
-    "facebook"
-  ) {
-    return "Facebook";
-  }
-
+  if (platform === "instagram") return "Instagram";
+  if (platform === "youtube") return "YouTube";
+  if (platform === "tiktok") return "TikTok";
+  if (platform === "facebook") return "Facebook";
   return platform;
 }
 
@@ -71,61 +47,51 @@ export default async function AutoReplyCommentPage() {
   const data =
     await getAutoReplyDashboardData();
 
+  const collectorConfigured =
+    Boolean(
+      process.env.MANYCHAT_WEBHOOK_SECRET
+    );
+
+  const dispatcherConfigured =
+    Boolean(
+      process.env.MANYCHAT_API_KEY
+    );
+
   const kpis = [
     {
-      label:
-        "New Comments",
-      value:
-        compact(
-          data.counts
-            .newComments
-        ),
-      note:
-        "Waiting for AI draft"
+      label: "New Comments",
+      value: compact(
+        data.counts.newComments
+      ),
+      note: "Waiting for AI draft"
     },
     {
-      label:
-        "Pending Approval",
-      value:
-        compact(
-          data.counts
-            .pendingApproval
-        ),
-      note:
-        "Human review required"
+      label: "Pending Approval",
+      value: compact(
+        data.counts.pendingApproval
+      ),
+      note: "Human review required"
     },
     {
-      label:
-        "AI Draft Ready",
-      value:
-        compact(
-          data.counts
-            .aiDraftReady
-        ),
-      note:
-        "Gemini-generated replies"
+      label: "AI Draft Ready",
+      value: compact(
+        data.counts.pendingApproval
+      ),
+      note: "Gemini-generated draft"
     },
     {
-      label:
-        "Replied Today",
-      value:
-        compact(
-          data.counts
-            .repliedToday
-        ),
-      note:
-        "Approved & sent"
+      label: "Replied Today",
+      value: compact(
+        data.counts.repliedToday
+      ),
+      note: "Approved & sent"
     },
     {
-      label:
-        "Escalated",
-      value:
-        compact(
-          data.counts
-            .escalated
-        ),
-      note:
-        "Needs human handling"
+      label: "Escalated",
+      value: compact(
+        data.counts.escalated
+      ),
+      note: "Needs human handling"
     }
   ];
 
@@ -141,7 +107,7 @@ export default async function AutoReplyCommentPage() {
             </h1>
 
             <p>
-              AI-assisted social media comment response with mandatory human approval
+              ManyChat intake, Vercel AI draft, mandatory human approval, and controlled dispatch
             </p>
           </div>
 
@@ -198,8 +164,7 @@ export default async function AutoReplyCommentPage() {
             <div>
               <p
                 style={{
-                  margin:
-                    "0 0 7px",
+                  margin: "0 0 7px",
                   fontSize: 9,
                   fontWeight: 900,
                   letterSpacing:
@@ -222,8 +187,7 @@ export default async function AutoReplyCommentPage() {
 
               <p
                 style={{
-                  margin:
-                    "8px 0 0",
+                  margin: "8px 0 0",
                   maxWidth: 650,
                   fontSize: 12,
                   lineHeight: 1.6,
@@ -231,44 +195,38 @@ export default async function AutoReplyCommentPage() {
                     "rgba(255,255,255,.78)"
                 }}
               >
-                AI drafts can be reviewed, edited, approved, rejected, or escalated here.
-                Approved replies are only queued — they are not sent until the dispatcher workflow is connected.
+                ManyChat sends the inbound event to Vercel. Gemini prepares a draft.
+                The exact edited text is sent only after a dashboard user approves it.
               </p>
             </div>
 
             <div
               style={{
-                display:
-                  "grid",
+                display: "grid",
                 gridTemplateColumns:
                   "repeat(5,auto)",
-                alignItems:
-                  "center",
+                alignItems: "center",
                 gap: 7,
                 fontSize: 10,
                 fontWeight: 800
               }}
             >
               {[
-                "Comment",
-                "n8n",
+                "Comment / DM",
+                "ManyChat",
                 "Gemini",
                 "Approve",
-                "Reply"
+                "Send"
               ].map(
                 (
                   item,
                   index
                 ) => (
                   <div
-                    key={
-                      item
-                    }
+                    key={item}
                     style={{
-                      display:
-                        "flex",
-                      alignItems:
-                        "center",
+                      display: "flex",
+                      alignItems: "center",
                       gap: 7
                     }}
                   >
@@ -276,14 +234,12 @@ export default async function AutoReplyCommentPage() {
                       style={{
                         display:
                           "inline-flex",
-                        minHeight:
-                          32,
+                        minHeight: 32,
                         alignItems:
                           "center",
                         padding:
                           "0 10px",
-                        borderRadius:
-                          9,
+                        borderRadius: 9,
                         border:
                           "1px solid rgba(255,255,255,.24)",
                         background:
@@ -295,12 +251,10 @@ export default async function AutoReplyCommentPage() {
                       {item}
                     </span>
 
-                    {index <
-                    4 ? (
+                    {index < 4 ? (
                       <span
                         style={{
-                          opacity:
-                            0.6
+                          opacity: 0.6
                         }}
                       >
                         →
@@ -326,9 +280,7 @@ export default async function AutoReplyCommentPage() {
             (item) => (
               <article
                 className="kpi-card"
-                key={
-                  item.label
-                }
+                key={item.label}
               >
                 <p>
                   {item.label}
@@ -340,11 +292,9 @@ export default async function AutoReplyCommentPage() {
 
                 <span
                   style={{
-                    display:
-                      "block",
+                    display: "block",
                     marginTop: 5,
-                    color:
-                      "#9aa2b7",
+                    color: "#9aa2b7",
                     fontSize: 9
                   }}
                 >
@@ -356,9 +306,7 @@ export default async function AutoReplyCommentPage() {
         </section>
 
         <AutoReplyApprovalInbox
-          comments={
-            data.pending
-          }
+          comments={data.pending}
         />
 
         <section
@@ -378,7 +326,7 @@ export default async function AutoReplyCommentPage() {
                 </h3>
 
                 <p>
-                  Current approval layer is active and ready for n8n ingestion
+                  Current ManyChat → Vercel → approval → ManyChat architecture
                 </p>
               </div>
             </div>
@@ -393,100 +341,102 @@ export default async function AutoReplyCommentPage() {
                 [
                   "Supabase",
                   "Connected",
-                  "Comments, drafts, approvals, and activity history"
+                  "Comments, drafts, approvals, send status, and audit history"
                 ],
                 [
                   "Approval Dashboard",
                   "Ready",
-                  "Approve, edit, reject, escalate, or ignore"
+                  "Edit, approve & send, reject, escalate, or ignore"
                 ],
                 [
-                  "n8n Collector",
-                  "Next Step",
-                  "Will insert incoming comments and AI drafts"
+                  "ManyChat Collector",
+                  collectorConfigured
+                    ? "Configured"
+                    : "Missing Secret",
+                  "Inbound External Request from ManyChat"
                 ],
                 [
-                  "Reply Dispatcher",
-                  "Not Active",
-                  "Will only read APPROVED comments"
+                  "ManyChat Dispatcher",
+                  dispatcherConfigured
+                    ? "Configured"
+                    : "Missing API Key",
+                  "Approved Instagram DM sent with exact dashboard text"
                 ]
               ].map(
                 ([
                   name,
                   status,
                   detail
-                ]) => (
-                  <div
-                    key={
-                      name
-                    }
-                    style={{
-                      display:
-                        "grid",
-                      gridTemplateColumns:
-                        "130px 100px 1fr",
-                      gap: 10,
-                      alignItems:
-                        "center",
-                      padding:
-                        "10px 0",
-                      borderBottom:
-                        "1px solid #eef0f6"
-                    }}
-                  >
-                    <strong
-                      style={{
-                        color:
-                          "#344054",
-                        fontSize:
-                          10
-                      }}
-                    >
-                      {name}
-                    </strong>
+                ]) => {
+                  const ready =
+                    status ===
+                      "Connected" ||
+                    status ===
+                      "Ready" ||
+                    status ===
+                      "Configured";
 
-                    <span
+                  return (
+                    <div
+                      key={name}
                       style={{
-                        borderRadius:
-                          999,
-                        padding:
-                          "5px 8px",
-                        textAlign:
+                        display: "grid",
+                        gridTemplateColumns:
+                          "140px 110px 1fr",
+                        gap: 10,
+                        alignItems:
                           "center",
-                        background:
-                          status ===
-                            "Connected" ||
-                          status ===
-                            "Ready"
-                            ? "#ecfdf3"
-                            : "#f7f8fc",
-                        color:
-                          status ===
-                            "Connected" ||
-                          status ===
-                            "Ready"
-                            ? "#067647"
-                            : "#667085",
-                        fontSize:
-                          8,
-                        fontWeight:
-                          800
+                        padding:
+                          "10px 0",
+                        borderBottom:
+                          "1px solid #eef0f6"
                       }}
                     >
-                      {status}
-                    </span>
+                      <strong
+                        style={{
+                          color:
+                            "#344054",
+                          fontSize: 10
+                        }}
+                      >
+                        {name}
+                      </strong>
 
-                    <span
-                      style={{
-                        color:
-                          "#8b93a7",
-                        fontSize: 9
-                      }}
-                    >
-                      {detail}
-                    </span>
-                  </div>
-                )
+                      <span
+                        style={{
+                          borderRadius:
+                            999,
+                          padding:
+                            "5px 8px",
+                          textAlign:
+                            "center",
+                          background:
+                            ready
+                              ? "#ecfdf3"
+                              : "#fff4ed",
+                          color:
+                            ready
+                              ? "#067647"
+                              : "#b54708",
+                          fontSize: 8,
+                          fontWeight: 800
+                        }}
+                      >
+                        {status}
+                      </span>
+
+                      <span
+                        style={{
+                          color:
+                            "#8b93a7",
+                          fontSize: 9
+                        }}
+                      >
+                        {detail}
+                      </span>
+                    </div>
+                  );
+                }
               )}
             </div>
           </article>
@@ -499,7 +449,7 @@ export default async function AutoReplyCommentPage() {
                 </h3>
 
                 <p>
-                  No public reply can be sent from this stage automatically
+                  Exact-text human approval before ManyChat dispatch
                 </p>
               </div>
             </div>
@@ -508,8 +458,7 @@ export default async function AutoReplyCommentPage() {
               style={{
                 display: "grid",
                 gap: 9,
-                color:
-                  "#59617a",
+                color: "#59617a",
                 fontSize: 10,
                 lineHeight: 1.55
               }}
@@ -519,19 +468,23 @@ export default async function AutoReplyCommentPage() {
               </div>
 
               <div>
-                ✓ Approved status only queues the reply.
+                ✓ Approve asks for confirmation before sending.
               </div>
 
               <div>
-                ✓ Reject and Ignore prevent dispatch.
+                ✓ ManyChat receives the exact approved text.
               </div>
 
               <div>
-                ✓ Escalated comments leave the automation queue.
+                ✓ Failed sends return to Pending Approval for retry.
               </div>
 
               <div>
-                ✓ Approval actions are saved in an audit trail.
+                ✓ Reject, Ignore, and Escalate never dispatch.
+              </div>
+
+              <div>
+                ✓ Sent time and dispatcher activity are stored in Supabase.
               </div>
             </div>
           </article>
@@ -545,7 +498,7 @@ export default async function AutoReplyCommentPage() {
               </h3>
 
               <p>
-                Audit trail for reviewed comments and replies
+                Audit trail for reviewed and dispatched replies
               </p>
             </div>
           </div>
@@ -554,37 +507,20 @@ export default async function AutoReplyCommentPage() {
             <table>
               <thead>
                 <tr>
-                  <th>
-                    Updated
-                  </th>
-                  <th>
-                    Platform
-                  </th>
-                  <th>
-                    Comment
-                  </th>
-                  <th>
-                    Action
-                  </th>
-                  <th>
-                    Reviewer
-                  </th>
-                  <th>
-                    Note
-                  </th>
+                  <th>Updated</th>
+                  <th>Platform</th>
+                  <th>Comment</th>
+                  <th>Action</th>
+                  <th>Reviewer</th>
+                  <th>Note</th>
                 </tr>
               </thead>
 
               <tbody>
-                {data
-                  .recentActivity
-                  .length ===
-                0 ? (
+                {data.recentActivity.length === 0 ? (
                   <tr>
                     <td
-                      colSpan={
-                        6
-                      }
+                      colSpan={6}
                       style={{
                         textAlign:
                           "center",
@@ -599,13 +535,9 @@ export default async function AutoReplyCommentPage() {
                   </tr>
                 ) : (
                   data.recentActivity.map(
-                    (
-                      item
-                    ) => (
+                    (item) => (
                       <tr
-                        key={
-                          item.id
-                        }
+                        key={item.id}
                       >
                         <td>
                           {formatDateTime(
@@ -621,8 +553,7 @@ export default async function AutoReplyCommentPage() {
 
                         <td
                           style={{
-                            maxWidth:
-                              360
+                            maxWidth: 360
                           }}
                         >
                           <div
@@ -663,7 +594,7 @@ export default async function AutoReplyCommentPage() {
         </section>
 
         <footer>
-          Auto Reply Comment • Human-in-the-loop Social Customer Care
+          Auto Reply Comment • ManyChat + Vercel Human-in-the-loop Customer Care
         </footer>
       </main>
     </div>
