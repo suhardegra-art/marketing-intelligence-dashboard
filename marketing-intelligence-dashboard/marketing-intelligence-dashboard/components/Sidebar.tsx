@@ -58,6 +58,7 @@ function itemHref(item: string) {
   if (item === "TikTok Live") return "/tiktok-live";
   if (item === "YouTube") return "/youtube";
   if (item === "Auto Reply Comment") return "/auto-reply-comment";
+  if (item === "Annual Big Event") return "/annual-big-event";
   return null;
 }
 
