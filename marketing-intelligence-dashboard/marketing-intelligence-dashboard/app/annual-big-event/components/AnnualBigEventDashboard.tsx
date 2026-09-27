@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  Fragment,
   useEffect,
   useMemo,
   useState
@@ -44,9 +45,7 @@ type AIAnalysis = {
 };
 
 function formatNumber(value: number) {
-  return new Intl.NumberFormat("en-US").format(
-    Math.round(value)
-  );
+  return new Intl.NumberFormat("en-US").format(Math.round(value));
 }
 
 function formatCompact(value: number) {
@@ -153,10 +152,7 @@ function buildModelData(events: AnnualBigEvent[]) {
 
   events.forEach((event) => {
     event.spkBreakdown.forEach((item) => {
-      map.set(
-        item.model,
-        (map.get(item.model) || 0) + item.qty
-      );
+      map.set(item.model, (map.get(item.model) || 0) + item.qty);
     });
   });
 
@@ -195,6 +191,20 @@ function buildCityData(events: AnnualBigEvent[]) {
     .sort((a, b) => b.spk - a.spk);
 }
 
+function statusClass(status: string) {
+  const normalized = status.toLowerCase();
+
+  if (normalized.includes("complete")) return styles.completed;
+  if (
+    normalized.includes("ongoing") ||
+    normalized.includes("on going")
+  ) {
+    return styles.ongoing;
+  }
+
+  return styles.upcoming;
+}
+
 const PIE_COLORS = [
   "#4f6ee8",
   "#34b8b3",
@@ -222,13 +232,28 @@ export default function AnnualBigEventDashboard({
   const [year, setYear] = useState("ALL");
   const [city, setCity] = useState("ALL");
   const [status, setStatus] = useState("ALL");
-  const [selected, setSelected] =
-    useState<AnnualBigEvent | null>(null);
+
+  const [expandedEventIds, setExpandedEventIds] =
+    useState<Set<string>>(new Set());
 
   const [ai, setAi] = useState<AIAnalysis | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState("");
   const [aiVersion, setAiVersion] = useState("");
+
+  function toggleEventDetail(eventId: string) {
+    setExpandedEventIds((current) => {
+      const next = new Set(current);
+
+      if (next.has(eventId)) {
+        next.delete(eventId);
+      } else {
+        next.add(eventId);
+      }
+
+      return next;
+    });
+  }
 
   useEffect(() => {
     if (!initialData.connected || !initialData.dataVersion) return;
@@ -237,13 +262,15 @@ export default function AnnualBigEventDashboard({
 
     const timer = window.setInterval(async () => {
       try {
-        const response = await fetch("/api/annual-big-event/data", {
-          cache: "no-store"
-        });
+        const response = await fetch(
+          "/api/annual-big-event/data",
+          { cache: "no-store" }
+        );
 
         if (!response.ok) return;
 
-        const latest = (await response.json()) as AnnualBigEventData;
+        const latest =
+          (await response.json()) as AnnualBigEventData;
 
         if (
           !cancelled &&
@@ -253,7 +280,7 @@ export default function AnnualBigEventDashboard({
           router.refresh();
         }
       } catch {
-        // Silent: auto-check must not interrupt the page.
+        // Background auto-check should never interrupt the page.
       }
     }, 60_000);
 
@@ -314,7 +341,9 @@ export default function AnnualBigEventDashboard({
           event.city,
           event.location,
           event.activity
-        ].some((value) => value.toLowerCase().includes(query));
+        ].some((value) =>
+          value.toLowerCase().includes(query)
+        );
 
       const matchesYear =
         year === "ALL" || String(event.year) === year;
@@ -382,14 +411,17 @@ export default function AnnualBigEventDashboard({
       (sum, event) => sum + event.totalBudget,
       0
     );
+
     const totalSpk = filteredEvents.reduce(
       (sum, event) => sum + event.totalSpk,
       0
     );
+
     const totalTestRide = filteredEvents.reduce(
       (sum, event) => sum + event.testRide,
       0
     );
+
     const totalFootTraffic = filteredEvents.reduce(
       (sum, event) => sum + event.footTraffic,
       0
@@ -417,9 +449,10 @@ export default function AnnualBigEventDashboard({
     setSyncError("");
 
     try {
-      const response = await fetch("/api/annual-big-event/data", {
-        cache: "no-store"
-      });
+      const response = await fetch(
+        "/api/annual-big-event/data",
+        { cache: "no-store" }
+      );
 
       const payload = await response.json();
 
@@ -449,9 +482,10 @@ export default function AnnualBigEventDashboard({
     setAiError("");
 
     try {
-      const response = await fetch("/api/annual-big-event/ai", {
-        method: "POST"
-      });
+      const response = await fetch(
+        "/api/annual-big-event/ai",
+        { method: "POST" }
+      );
 
       const payload = await response.json();
 
@@ -483,7 +517,6 @@ export default function AnnualBigEventDashboard({
     ) {
       generateAi();
     }
-    // Intentional: generate on entering AI tab or when source version changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [view, initialData.dataVersion]);
 
@@ -501,12 +534,16 @@ export default function AnnualBigEventDashboard({
     {
       label: "Total SPK",
       value: formatNumber(filteredSummary.totalSpk),
-      note: `Conversion ${pct(filteredSummary.testRideToSpk)}`
+      note: `Conversion ${pct(
+        filteredSummary.testRideToSpk
+      )}`
     },
     {
       label: "Total Test Ride",
       value: formatNumber(filteredSummary.totalTestRide),
-      note: `${pct(filteredSummary.trafficToTestRide)} of foot traffic`
+      note: `${pct(
+        filteredSummary.trafficToTestRide
+      )} of foot traffic`
     },
     {
       label: "Foot Traffic",
@@ -612,8 +649,8 @@ export default function AnnualBigEventDashboard({
               <div>
                 <h2>Event Data</h2>
                 <p>
-                  Flexible event rows, SPK model breakdown, and budget
-                  categories from Google Sheet.
+                  Klik tanda panah pada Nama Event untuk melihat detail
+                  SPK dan Budget dari baris kuning Google Sheet.
                 </p>
               </div>
 
@@ -630,14 +667,18 @@ export default function AnnualBigEventDashboard({
               <input
                 className={styles.input}
                 value={search}
-                onChange={(event) => setSearch(event.target.value)}
+                onChange={(event) =>
+                  setSearch(event.target.value)
+                }
                 placeholder="Search event, city, location, activity..."
               />
 
               <select
                 className={styles.select}
                 value={year}
-                onChange={(event) => setYear(event.target.value)}
+                onChange={(event) =>
+                  setYear(event.target.value)
+                }
               >
                 <option value="ALL">All Years</option>
                 {years.map((value) => (
@@ -650,7 +691,9 @@ export default function AnnualBigEventDashboard({
               <select
                 className={styles.select}
                 value={city}
-                onChange={(event) => setCity(event.target.value)}
+                onChange={(event) =>
+                  setCity(event.target.value)
+                }
               >
                 <option value="ALL">All Cities</option>
                 {cities.map((value) => (
@@ -663,7 +706,9 @@ export default function AnnualBigEventDashboard({
               <select
                 className={styles.select}
                 value={status}
-                onChange={(event) => setStatus(event.target.value)}
+                onChange={(event) =>
+                  setStatus(event.target.value)
+                }
               >
                 <option value="ALL">All Status</option>
                 {statuses.map((value) => (
@@ -712,69 +757,301 @@ export default function AnnualBigEventDashboard({
                 <tbody>
                   {filteredEvents.length === 0 ? (
                     <tr>
-                      <td colSpan={15}>No event data found.</td>
+                      <td colSpan={15}>
+                        No event data found.
+                      </td>
                     </tr>
                   ) : (
-                    filteredEvents.map((event) => (
-                      <tr key={event.id}>
-                        <td>{formatDate(event.startDate)}</td>
-                        <td className={styles.eventName}>
-                          <button
-                            type="button"
-                            className={styles.eventNameButton}
-                            onClick={() => setSelected(event)}
-                            title="Open event detail"
+                    filteredEvents.map((event) => {
+                      const expanded =
+                        expandedEventIds.has(event.id);
+
+                      return (
+                        <Fragment key={event.id}>
+                          <tr
+                            className={
+                              expanded
+                                ? styles.expandedMainRow
+                                : undefined
+                            }
                           >
-                            {event.eventName}
-                          </button>
-                        </td>
-                        <td>
-                          <span className={styles.status}>
-                            {event.status || "—"}
-                          </span>
-                        </td>
-                        <td>{event.city || "—"}</td>
-                        <td>{event.location || "—"}</td>
-                        <td>{formatDate(event.endDate)}</td>
-                        <td className={styles.activityCell}>
-                          {event.activity || "—"}
-                        </td>
-                        <td>{event.area || "—"}</td>
-                        <td>{formatNumber(event.mediaPosting)}</td>
-                        <td>{formatNumber(event.footTraffic)}</td>
-                        <td>{formatNumber(event.testRide)}</td>
-                        <td>{formatNumber(event.totalSpk)}</td>
-                        <td>{formatCurrency(event.totalBudget)}</td>
-                        <td>
-                          {event.sppLink ? (
-                            <a
-                              className={styles.tableLink}
-                              href={event.sppLink}
-                              target="_blank"
-                              rel="noreferrer"
-                            >
-                              Open ↗
-                            </a>
-                          ) : (
-                            "—"
-                          )}
-                        </td>
-                        <td>
-                          {event.quotationLink ? (
-                            <a
-                              className={styles.tableLink}
-                              href={event.quotationLink}
-                              target="_blank"
-                              rel="noreferrer"
-                            >
-                              Open ↗
-                            </a>
-                          ) : (
-                            "—"
-                          )}
-                        </td>
-                      </tr>
-                    ))
+                            <td>
+                              {formatDate(event.startDate)}
+                            </td>
+
+                            <td className={styles.eventName}>
+                              <div className={styles.eventNameWrap}>
+                                <button
+                                  type="button"
+                                  className={styles.expandButton}
+                                  onClick={() =>
+                                    toggleEventDetail(event.id)
+                                  }
+                                  aria-expanded={expanded}
+                                  title={
+                                    expanded
+                                      ? "Hide detail"
+                                      : "Show SPK & Budget detail"
+                                  }
+                                >
+                                  {expanded ? "▾" : "›"}
+                                </button>
+
+                                <button
+                                  type="button"
+                                  className={styles.eventNameButton}
+                                  onClick={() =>
+                                    toggleEventDetail(event.id)
+                                  }
+                                  aria-expanded={expanded}
+                                >
+                                  {event.eventName}
+                                </button>
+                              </div>
+                            </td>
+
+                            <td>
+                              <span
+                                className={statusClass(
+                                  event.status || ""
+                                )}
+                              >
+                                {event.status || "—"}
+                              </span>
+                            </td>
+
+                            <td>{event.city || "—"}</td>
+                            <td>{event.location || "—"}</td>
+                            <td>{formatDate(event.endDate)}</td>
+
+                            <td className={styles.activityCell}>
+                              {event.activity || "—"}
+                            </td>
+
+                            <td>{event.area || "—"}</td>
+
+                            <td>
+                              {formatNumber(event.mediaPosting)}
+                            </td>
+
+                            <td>
+                              {formatNumber(event.footTraffic)}
+                            </td>
+
+                            <td>
+                              {formatNumber(event.testRide)}
+                            </td>
+
+                            <td>
+                              <strong>
+                                {formatNumber(event.totalSpk)}
+                              </strong>
+                            </td>
+
+                            <td>
+                              <strong>
+                                {formatCurrency(event.totalBudget)}
+                              </strong>
+                            </td>
+
+                            <td>
+                              {event.sppLink ? (
+                                <a
+                                  className={styles.tableLink}
+                                  href={event.sppLink}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                >
+                                  Open ↗
+                                </a>
+                              ) : (
+                                "—"
+                              )}
+                            </td>
+
+                            <td>
+                              {event.quotationLink ? (
+                                <a
+                                  className={styles.tableLink}
+                                  href={event.quotationLink}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                >
+                                  Open ↗
+                                </a>
+                              ) : (
+                                "—"
+                              )}
+                            </td>
+                          </tr>
+
+                          {expanded ? (
+                            <tr className={styles.detailTableRow}>
+                              <td colSpan={15}>
+                                <div className={styles.inlineDetail}>
+                                  <div className={styles.inlineDetailHeader}>
+                                    <div>
+                                      <strong>
+                                        Detail · {event.eventName}
+                                      </strong>
+                                      <span>
+                                        Data detail mengikuti baris kuning
+                                        pada Google Sheet.
+                                      </span>
+                                    </div>
+
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        toggleEventDetail(event.id)
+                                      }
+                                    >
+                                      Close
+                                    </button>
+                                  </div>
+
+                                  <div className={styles.inlineDetailGrid}>
+                                    <section className={styles.detailYellowCard}>
+                                      <div className={styles.detailCardHead}>
+                                        <div>
+                                          <span>SPK BREAKDOWN</span>
+                                          <strong>
+                                            {formatNumber(event.totalSpk)}
+                                          </strong>
+                                        </div>
+
+                                        <small>
+                                          Declared Total SPK
+                                        </small>
+                                      </div>
+
+                                      <div className={styles.breakdownList}>
+                                        {event.spkBreakdown.length ? (
+                                          event.spkBreakdown.map((item) => (
+                                            <div
+                                              className={styles.breakdownRow}
+                                              key={item.model}
+                                            >
+                                              <span>{item.model}</span>
+                                              <strong>
+                                                {formatNumber(item.qty)}
+                                              </strong>
+                                            </div>
+                                          ))
+                                        ) : (
+                                          <div className={styles.breakdownEmpty}>
+                                            No SPK breakdown.
+                                          </div>
+                                        )}
+                                      </div>
+
+                                      <div className={styles.breakdownTotal}>
+                                        <span>Breakdown Total</span>
+                                        <strong>
+                                          {formatNumber(
+                                            event.spkBreakdownTotal
+                                          )}
+                                        </strong>
+                                      </div>
+                                    </section>
+
+                                    <section className={styles.detailYellowCard}>
+                                      <div className={styles.detailCardHead}>
+                                        <div>
+                                          <span>BUDGET BREAKDOWN</span>
+                                          <strong>
+                                            {formatCurrency(
+                                              event.totalBudget
+                                            )}
+                                          </strong>
+                                        </div>
+
+                                        <small>
+                                          Declared Total Budget
+                                        </small>
+                                      </div>
+
+                                      <div className={styles.breakdownList}>
+                                        {event.budgetBreakdown.length ? (
+                                          event.budgetBreakdown.map(
+                                            (item) => (
+                                              <div
+                                                className={
+                                                  styles.breakdownRow
+                                                }
+                                                key={item.category}
+                                              >
+                                                <span>
+                                                  {item.category}
+                                                </span>
+                                                <strong>
+                                                  {formatCurrency(
+                                                    item.amount
+                                                  )}
+                                                </strong>
+                                              </div>
+                                            )
+                                          )
+                                        ) : (
+                                          <div
+                                            className={
+                                              styles.breakdownEmpty
+                                            }
+                                          >
+                                            No budget breakdown.
+                                          </div>
+                                        )}
+                                      </div>
+
+                                      <div className={styles.breakdownTotal}>
+                                        <span>Breakdown Total</span>
+                                        <strong>
+                                          {formatCurrency(
+                                            event.budgetBreakdownTotal
+                                          )}
+                                        </strong>
+                                      </div>
+                                    </section>
+                                  </div>
+
+                                  <div className={styles.inlineDetailFooter}>
+                                    <span>
+                                      Test Ride → SPK{" "}
+                                      <strong>
+                                        {pct(event.testRideToSpk)}
+                                      </strong>
+                                    </span>
+
+                                    <span>
+                                      Cost / SPK{" "}
+                                      <strong>
+                                        {formatCurrency(
+                                          event.costPerSpk
+                                        )}
+                                      </strong>
+                                    </span>
+
+                                    <span
+                                      className={
+                                        event.dataQuality.spkMatches &&
+                                        event.dataQuality.budgetMatches
+                                          ? styles.dataOk
+                                          : styles.dataWarn
+                                      }
+                                    >
+                                      {event.dataQuality.spkMatches &&
+                                      event.dataQuality.budgetMatches
+                                        ? "✓ Detail totals match"
+                                        : "⚠ Detail total mismatch"}
+                                    </span>
+                                  </div>
+                                </div>
+                              </td>
+                            </tr>
+                          ) : null}
+                        </Fragment>
+                      );
+                    })
                   )}
                 </tbody>
               </table>
@@ -785,7 +1062,10 @@ export default function AnnualBigEventDashboard({
         <>
           <section className={styles.kpiGrid}>
             {kpis.map((item) => (
-              <article className={styles.kpi} key={item.label}>
+              <article
+                className={styles.kpi}
+                key={item.label}
+              >
                 <p>{item.label}</p>
                 <strong>{item.value}</strong>
                 <small>{item.note}</small>
@@ -820,7 +1100,8 @@ export default function AnnualBigEventDashboard({
             <section className={styles.emptyAi}>
               {aiLoading
                 ? "Generating AI analysis..."
-                : aiError || "AI analysis is ready to generate."}
+                : aiError ||
+                  "AI analysis is ready to generate."}
             </section>
           )}
 
@@ -837,7 +1118,7 @@ export default function AnnualBigEventDashboard({
                 </div>
               </div>
 
-              <div style={{ display: "grid", gap: 14, marginTop: 26 }}>
+              <div className={styles.funnelWrap}>
                 {[
                   {
                     label: "Foot Traffic",
@@ -856,42 +1137,25 @@ export default function AnnualBigEventDashboard({
                   }
                 ].map((item) => (
                   <div
+                    className={styles.funnelBar}
                     key={item.label}
-                    style={{
-                      margin: "0 auto",
-                      width: item.width,
-                      borderRadius: 10,
-                      padding: "14px 16px",
-                      background:
-                        "linear-gradient(90deg,#4b6ee8,#6d9cf1)",
-                      color: "white",
-                      display: "flex",
-                      justifyContent: "space-between",
-                      gap: 10,
-                      fontSize: 10,
-                      fontWeight: 900
-                    }}
+                    style={{ width: item.width }}
                   >
                     <span>{item.label}</span>
-                    <strong>{formatNumber(item.value)}</strong>
+                    <strong>
+                      {formatNumber(item.value)}
+                    </strong>
                   </div>
                 ))}
 
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "center",
-                    gap: 24,
-                    color: "#67728b",
-                    fontSize: 9
-                  }}
-                >
+                <div className={styles.funnelMeta}>
                   <span>
                     Traffic → Test Ride{" "}
                     <strong>
                       {pct(filteredSummary.trafficToTestRide)}
                     </strong>
                   </span>
+
                   <span>
                     Test Ride → SPK{" "}
                     <strong>
@@ -906,12 +1170,17 @@ export default function AnnualBigEventDashboard({
               <div className={styles.panelHead}>
                 <div>
                   <h3>SPK by Model</h3>
-                  <p>Dynamic model mix from detail rows.</p>
+                  <p>
+                    Dynamic model mix from detail rows.
+                  </p>
                 </div>
               </div>
 
               <div className={styles.chartBox}>
-                <ResponsiveContainer width="100%" height="100%">
+                <ResponsiveContainer
+                  width="100%"
+                  height="100%"
+                >
                   <PieChart>
                     <Pie
                       data={modelData}
@@ -924,13 +1193,22 @@ export default function AnnualBigEventDashboard({
                       {modelData.map((row, index) => (
                         <Cell
                           key={row.name}
-                          fill={PIE_COLORS[index % PIE_COLORS.length]}
+                          fill={
+                            PIE_COLORS[
+                              index % PIE_COLORS.length
+                            ]
+                          }
                         />
                       ))}
                     </Pie>
+
                     <Tooltip
-                      formatter={(value: number | string) =>
-                        formatNumber(Number(value))
+                      formatter={(
+                        value: number | string
+                      ) =>
+                        formatNumber(
+                          Number(value)
+                        )
                       }
                     />
                   </PieChart>
@@ -942,12 +1220,17 @@ export default function AnnualBigEventDashboard({
               <div className={styles.panelHead}>
                 <div>
                   <h3>Budget Composition</h3>
-                  <p>Dynamic budget categories from detail rows.</p>
+                  <p>
+                    Dynamic budget categories from detail rows.
+                  </p>
                 </div>
               </div>
 
               <div className={styles.chartBox}>
-                <ResponsiveContainer width="100%" height="100%">
+                <ResponsiveContainer
+                  width="100%"
+                  height="100%"
+                >
                   <PieChart>
                     <Pie
                       data={budgetData}
@@ -960,13 +1243,22 @@ export default function AnnualBigEventDashboard({
                       {budgetData.map((row, index) => (
                         <Cell
                           key={row.name}
-                          fill={PIE_COLORS[index % PIE_COLORS.length]}
+                          fill={
+                            PIE_COLORS[
+                              index % PIE_COLORS.length
+                            ]
+                          }
                         />
                       ))}
                     </Pie>
+
                     <Tooltip
-                      formatter={(value: number | string) =>
-                        formatCurrency(Number(value))
+                      formatter={(
+                        value: number | string
+                      ) =>
+                        formatCurrency(
+                          Number(value)
+                        )
                       }
                     />
                   </PieChart>
@@ -985,40 +1277,60 @@ export default function AnnualBigEventDashboard({
               </div>
 
               <div className={styles.chartBox}>
-                <ResponsiveContainer width="100%" height="100%">
+                <ResponsiveContainer
+                  width="100%"
+                  height="100%"
+                >
                   <ComposedChart data={performanceData}>
                     <CartesianGrid
                       strokeDasharray="4 4"
                       vertical={false}
                       stroke="#e9edf5"
                     />
+
                     <XAxis
                       dataKey="name"
-                      tick={{ fontSize: 8, fill: "#7f89a1" }}
+                      tick={{
+                        fontSize: 8,
+                        fill: "#7f89a1"
+                      }}
                       axisLine={false}
                       tickLine={false}
                     />
+
                     <YAxis
                       yAxisId="left"
-                      tick={{ fontSize: 8, fill: "#7f89a1" }}
+                      tick={{
+                        fontSize: 8,
+                        fill: "#7f89a1"
+                      }}
                       axisLine={false}
                       tickLine={false}
                     />
+
                     <YAxis
                       yAxisId="right"
                       orientation="right"
-                      tickFormatter={(value) => formatCompact(Number(value))}
-                      tick={{ fontSize: 8, fill: "#7f89a1" }}
+                      tickFormatter={(value) =>
+                        formatCompact(Number(value))
+                      }
+                      tick={{
+                        fontSize: 8,
+                        fill: "#7f89a1"
+                      }}
                       axisLine={false}
                       tickLine={false}
                     />
+
                     <Tooltip />
+
                     <Bar
                       yAxisId="left"
                       dataKey="spk"
                       fill="#4f6ee8"
                       radius={[5, 5, 0, 0]}
                     />
+
                     <Line
                       yAxisId="right"
                       type="monotone"
@@ -1041,7 +1353,10 @@ export default function AnnualBigEventDashboard({
               </div>
 
               <div className={styles.chartBox}>
-                <ResponsiveContainer width="100%" height="100%">
+                <ResponsiveContainer
+                  width="100%"
+                  height="100%"
+                >
                   <BarChart
                     data={topEvents}
                     layout="vertical"
@@ -1052,21 +1367,31 @@ export default function AnnualBigEventDashboard({
                       horizontal={false}
                       stroke="#edf0f5"
                     />
+
                     <XAxis
                       type="number"
                       axisLine={false}
                       tickLine={false}
-                      tick={{ fontSize: 8, fill: "#7f89a1" }}
+                      tick={{
+                        fontSize: 8,
+                        fill: "#7f89a1"
+                      }}
                     />
+
                     <YAxis
                       type="category"
                       dataKey="name"
                       axisLine={false}
                       tickLine={false}
                       width={95}
-                      tick={{ fontSize: 8, fill: "#59637b" }}
+                      tick={{
+                        fontSize: 8,
+                        fill: "#59637b"
+                      }}
                     />
+
                     <Tooltip />
+
                     <Bar
                       dataKey="spk"
                       fill="#5d94ed"
@@ -1088,25 +1413,38 @@ export default function AnnualBigEventDashboard({
               </div>
 
               <div className={styles.chartBox}>
-                <ResponsiveContainer width="100%" height="100%">
+                <ResponsiveContainer
+                  width="100%"
+                  height="100%"
+                >
                   <BarChart data={cityData}>
                     <CartesianGrid
                       strokeDasharray="4 4"
                       vertical={false}
                       stroke="#edf0f5"
                     />
+
                     <XAxis
                       dataKey="city"
                       axisLine={false}
                       tickLine={false}
-                      tick={{ fontSize: 8, fill: "#7f89a1" }}
+                      tick={{
+                        fontSize: 8,
+                        fill: "#7f89a1"
+                      }}
                     />
+
                     <YAxis
                       axisLine={false}
                       tickLine={false}
-                      tick={{ fontSize: 8, fill: "#7f89a1" }}
+                      tick={{
+                        fontSize: 8,
+                        fill: "#7f89a1"
+                      }}
                     />
+
                     <Tooltip />
+
                     <Bar
                       dataKey="spk"
                       fill="#4f8ce9"
@@ -1125,7 +1463,7 @@ export default function AnnualBigEventDashboard({
                 </div>
               </div>
 
-              <div style={{ display: "grid", gap: 10 }}>
+              <div className={styles.efficiencyList}>
                 {[
                   [
                     "Traffic → Test Ride",
@@ -1155,17 +1493,10 @@ export default function AnnualBigEventDashboard({
                   ]
                 ].map(([label, value]) => (
                   <div
+                    className={styles.efficiencyRow}
                     key={label}
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      gap: 12,
-                      borderBottom: "1px solid #edf0f5",
-                      padding: "10px 0",
-                      fontSize: 10
-                    }}
                   >
-                    <span style={{ color: "#778198" }}>{label}</span>
+                    <span>{label}</span>
                     <strong>{value}</strong>
                   </div>
                 ))}
@@ -1178,13 +1509,18 @@ export default function AnnualBigEventDashboard({
               <div className={styles.panelHead}>
                 <div>
                   <h3>Key Insights</h3>
-                  <p>AI interpretation of the current source data.</p>
+                  <p>
+                    AI interpretation of the current source data.
+                  </p>
                 </div>
               </div>
 
               {ai?.key_insights?.length ? (
                 ai.key_insights.map((item, index) => (
-                  <div className={styles.insightItem} key={`${item.title}-${index}`}>
+                  <div
+                    className={styles.insightItem}
+                    key={`${item.title}-${index}`}
+                  >
                     <span className={styles.insightNumber}>
                       {index + 1}
                     </span>
@@ -1196,7 +1532,7 @@ export default function AnnualBigEventDashboard({
                   </div>
                 ))
               ) : (
-                <p style={{ color: "#8a92a8", fontSize: 10 }}>
+                <p className={styles.aiMuted}>
                   {aiLoading
                     ? "Analyzing..."
                     : "No AI insights yet."}
@@ -1204,22 +1540,26 @@ export default function AnnualBigEventDashboard({
               )}
             </article>
 
-            <div style={{ display: "grid", gap: 14 }}>
+            <div className={styles.aiSideStack}>
               <article className={styles.recommendations}>
                 <div className={styles.panelHead}>
                   <div>
                     <h3>AI Recommendations</h3>
-                    <p>Prioritized planning actions.</p>
+                    <p>
+                      Prioritized planning actions.
+                    </p>
                   </div>
                 </div>
 
                 <ul>
-                  {(ai?.recommendations || []).map((item, index) => (
-                    <li key={index}>
-                      <span>✓</span>
-                      <div>{item}</div>
-                    </li>
-                  ))}
+                  {(ai?.recommendations || []).map(
+                    (item, index) => (
+                      <li key={index}>
+                        <span>✓</span>
+                        <div>{item}</div>
+                      </li>
+                    )
+                  )}
                 </ul>
               </article>
 
@@ -1234,12 +1574,14 @@ export default function AnnualBigEventDashboard({
                 </div>
 
                 <ul className={styles.qualityList}>
-                  {(ai?.data_quality || []).map((item, index) => (
-                    <li key={index}>
-                      <span>!</span>
-                      <div>{item}</div>
-                    </li>
-                  ))}
+                  {(ai?.data_quality || []).map(
+                    (item, index) => (
+                      <li key={index}>
+                        <span>!</span>
+                        <div>{item}</div>
+                      </li>
+                    )
+                  )}
 
                   {ai?.confidence_note ? (
                     <li>
@@ -1253,161 +1595,6 @@ export default function AnnualBigEventDashboard({
           </section>
         </>
       )}
-
-      {selected ? (
-        <div
-          className={styles.modalBackdrop}
-          onClick={() => setSelected(null)}
-        >
-          <div
-            className={styles.modal}
-            onClick={(event) => event.stopPropagation()}
-          >
-            <div className={styles.modalHead}>
-              <div>
-                <h3>{selected.eventName}</h3>
-                <p>
-                  {formatDate(selected.startDate)}
-                  {selected.endDate
-                    ? ` – ${formatDate(selected.endDate)}`
-                    : ""}{" "}
-                  · {selected.city}
-                </p>
-              </div>
-
-              <button
-                className={styles.close}
-                type="button"
-                onClick={() => setSelected(null)}
-              >
-                ×
-              </button>
-            </div>
-
-            <div className={styles.detailGrid}>
-              <div className={styles.detailBox}>
-                <h4>SPK Breakdown</h4>
-
-                {selected.spkBreakdown.map((item) => (
-                  <div className={styles.detailRow} key={item.model}>
-                    <span>{item.model}</span>
-                    <strong>{formatNumber(item.qty)}</strong>
-                  </div>
-                ))}
-
-                <div className={styles.detailRow}>
-                  <span>Breakdown Total</span>
-                  <strong>{formatNumber(selected.spkBreakdownTotal)}</strong>
-                </div>
-
-                <div className={styles.detailRow}>
-                  <span>Declared Total SPK</span>
-                  <strong>{formatNumber(selected.totalSpk)}</strong>
-                </div>
-              </div>
-
-              <div className={styles.detailBox}>
-                <h4>Budget Breakdown</h4>
-
-                {selected.budgetBreakdown.map((item) => (
-                  <div className={styles.detailRow} key={item.category}>
-                    <span>{item.category}</span>
-                    <strong>{formatCurrency(item.amount)}</strong>
-                  </div>
-                ))}
-
-                <div className={styles.detailRow}>
-                  <span>Breakdown Total</span>
-                  <strong>
-                    {formatCurrency(selected.budgetBreakdownTotal)}
-                  </strong>
-                </div>
-
-                <div className={styles.detailRow}>
-                  <span>Declared Total Budget</span>
-                  <strong>{formatCurrency(selected.totalBudget)}</strong>
-                </div>
-              </div>
-            </div>
-
-            <div className={styles.detailGrid} style={{ marginTop: 14 }}>
-              <div className={styles.detailBox}>
-                <h4>Event Information</h4>
-
-                {[
-                  ["Location", selected.location || "—"],
-                  ["Activity", selected.activity || "—"],
-                  ["Area", selected.area || "—"],
-                  [
-                    "Media Posting",
-                    formatNumber(selected.mediaPosting)
-                  ],
-                  [
-                    "Foot Traffic",
-                    formatNumber(selected.footTraffic)
-                  ],
-                  ["Test Ride", formatNumber(selected.testRide)]
-                ].map(([label, value]) => (
-                  <div className={styles.detailRow} key={label}>
-                    <span>{label}</span>
-                    <strong>{value}</strong>
-                  </div>
-                ))}
-              </div>
-
-              <div className={styles.detailBox}>
-                <h4>Efficiency</h4>
-
-                {[
-                  [
-                    "Traffic → Test Ride",
-                    pct(selected.trafficToTestRide)
-                  ],
-                  [
-                    "Test Ride → SPK",
-                    pct(selected.testRideToSpk)
-                  ],
-                  [
-                    "Cost / SPK",
-                    formatCurrency(selected.costPerSpk)
-                  ],
-                  [
-                    "Cost / Test Ride",
-                    formatCurrency(selected.costPerTestRide)
-                  ]
-                ].map(([label, value]) => (
-                  <div className={styles.detailRow} key={label}>
-                    <span>{label}</span>
-                    <strong>{value}</strong>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className={styles.links}>
-              {selected.sppLink ? (
-                <a
-                  href={selected.sppLink}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  Open SPP ↗
-                </a>
-              ) : null}
-
-              {selected.quotationLink ? (
-                <a
-                  href={selected.quotationLink}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  Open Quotation ↗
-                </a>
-              ) : null}
-            </div>
-          </div>
-        </div>
-      ) : null}
     </div>
   );
 }
