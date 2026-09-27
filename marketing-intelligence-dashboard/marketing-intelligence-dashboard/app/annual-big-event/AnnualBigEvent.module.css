@@ -94,6 +94,14 @@
   margin-bottom: 16px;
 }
 
+.tabs > :first-child {
+  order: 2;
+}
+
+.tabs > :nth-child(2) {
+  order: 1;
+}
+
 .tab {
   min-height: 40px;
   border: 0;
@@ -461,6 +469,7 @@
   padding: 42px 20px;
   color: #7b849b;
   font-size: 10px;
+  margin-bottom: 14px;
 }
 
 .modalBackdrop {
