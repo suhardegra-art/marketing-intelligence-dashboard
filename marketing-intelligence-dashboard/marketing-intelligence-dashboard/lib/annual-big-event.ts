@@ -32,7 +32,7 @@ export type AnnualBigEvent = {
   trafficToTestRide: number;
   costPerSpk: number;
   costPerTestRide: number;
-  status: "Completed" | "Ongoing" | "Upcoming";
+  status: string;
   year: number | null;
   dataQuality: {
     spkMatches: boolean;
@@ -192,6 +192,7 @@ export function normalizeAnnualBigEventRows(
   const ix = {
     startDate: headerIndex(headerRow, ["tanggal", "date", "start date"]),
     eventName: headerIndex(headerRow, ["nama event", "event name"]),
+    status: headerIndex(headerRow, ["status"]),
     city: headerIndex(headerRow, ["kota", "city"]),
     location: headerIndex(headerRow, ["location", "lokasi"]),
     endDate: headerIndex(headerRow, ["finished event", "end date", "tanggal selesai"]),
@@ -310,7 +311,10 @@ export function normalizeAnnualBigEventRows(
         trafficToTestRide: 0,
         costPerSpk: 0,
         costPerTestRide: 0,
-        status: eventStatus(startDate, endDate),
+        status:
+          ix.status >= 0 && safeString(row[ix.status])
+            ? safeString(row[ix.status])
+            : eventStatus(startDate, endDate),
         year: yearFromDate(startDate),
         dataQuality: {
           spkMatches: true,

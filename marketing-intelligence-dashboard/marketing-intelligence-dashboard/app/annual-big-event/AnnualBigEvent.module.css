@@ -224,7 +224,7 @@
 .table {
   width: 100%;
   border-collapse: collapse;
-  min-width: 1050px;
+  min-width: 1620px;
   font-size: 9.5px;
 }
 
@@ -250,6 +250,38 @@
 .eventName {
   color: #1b2541 !important;
   font-weight: 900 !important;
+}
+
+.eventNameButton {
+  border: 0;
+  background: transparent;
+  color: #1b2541;
+  font: inherit;
+  font-weight: 900;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+}
+
+.eventNameButton:hover {
+  color: #4059d7;
+  text-decoration: underline;
+}
+
+.activityCell {
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tableLink {
+  color: #4059d7;
+  font-weight: 900;
+  text-decoration: none;
+}
+
+.tableLink:hover {
+  text-decoration: underline;
 }
 
 .status {

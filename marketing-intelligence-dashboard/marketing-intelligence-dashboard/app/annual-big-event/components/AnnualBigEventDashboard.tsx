@@ -95,30 +95,30 @@ function csvEscape(value: string | number) {
 
 function exportCsv(events: AnnualBigEvent[]) {
   const header = [
-    "Start Date",
-    "End Date",
-    "Event",
-    "City",
+    "Tanggal",
+    "Nama Event",
+    "Status",
+    "Kota",
     "Location",
+    "Finished event",
     "Activity",
-    "Area",
+    "Luas Lahan",
     "Media Posting",
     "Foot Traffic",
     "Test Ride",
-    "Total SPK",
-    "Total Budget",
-    "Traffic to Test Ride %",
-    "Test Ride to SPK %",
-    "Cost per SPK",
-    "Status"
+    "SPK",
+    "Budget",
+    "SPP Link",
+    "Quotation"
   ];
 
   const body = events.map((event) => [
     event.startDate,
-    event.endDate,
     event.eventName,
+    event.status,
     event.city,
     event.location,
+    event.endDate,
     event.activity,
     event.area,
     event.mediaPosting,
@@ -126,10 +126,8 @@ function exportCsv(events: AnnualBigEvent[]) {
     event.testRide,
     event.totalSpk,
     event.totalBudget,
-    event.trafficToTestRide.toFixed(2),
-    event.testRideToSpk.toFixed(2),
-    Math.round(event.costPerSpk),
-    event.status
+    event.sppLink || "",
+    event.quotationLink || ""
   ]);
 
   const csv = [header, ...body]
@@ -287,6 +285,18 @@ export default function AnnualBigEventDashboard({
         new Set(
           initialData.events
             .map((event) => event.city)
+            .filter(Boolean)
+        )
+      ).sort(),
+    [initialData.events]
+  );
+
+  const statuses = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          initialData.events
+            .map((event) => event.status)
             .filter(Boolean)
         )
       ).sort(),
@@ -656,9 +666,11 @@ export default function AnnualBigEventDashboard({
                 onChange={(event) => setStatus(event.target.value)}
               >
                 <option value="ALL">All Status</option>
-                <option value="Completed">Completed</option>
-                <option value="Ongoing">Ongoing</option>
-                <option value="Upcoming">Upcoming</option>
+                {statuses.map((value) => (
+                  <option value={value} key={value}>
+                    {value}
+                  </option>
+                ))}
               </select>
 
               <button
@@ -679,78 +691,87 @@ export default function AnnualBigEventDashboard({
               <table className={styles.table}>
                 <thead>
                   <tr>
-                    <th>#</th>
-                    <th>Event</th>
-                    <th>Date</th>
-                    <th>City</th>
+                    <th>Tanggal</th>
+                    <th>Nama Event</th>
+                    <th>Status</th>
+                    <th>Kota</th>
+                    <th>Location</th>
+                    <th>Finished Event</th>
+                    <th>Activity</th>
+                    <th>Luas Lahan</th>
+                    <th>Media Posting</th>
                     <th>Foot Traffic</th>
                     <th>Test Ride</th>
                     <th>SPK</th>
-                    <th>Conversion</th>
-                    <th>Total Budget</th>
-                    <th>Cost / SPK</th>
-                    <th>Data Quality</th>
-                    <th>Status</th>
-                    <th>Action</th>
+                    <th>Budget</th>
+                    <th>SPP Link</th>
+                    <th>Quotation</th>
                   </tr>
                 </thead>
 
                 <tbody>
                   {filteredEvents.length === 0 ? (
                     <tr>
-                      <td colSpan={13}>No event data found.</td>
+                      <td colSpan={15}>No event data found.</td>
                     </tr>
                   ) : (
-                    filteredEvents.map((event, index) => (
+                    filteredEvents.map((event) => (
                       <tr key={event.id}>
-                        <td>{index + 1}</td>
+                        <td>{formatDate(event.startDate)}</td>
                         <td className={styles.eventName}>
-                          {event.eventName}
+                          <button
+                            type="button"
+                            className={styles.eventNameButton}
+                            onClick={() => setSelected(event)}
+                            title="Open event detail"
+                          >
+                            {event.eventName}
+                          </button>
                         </td>
                         <td>
-                          {formatDate(event.startDate)}
-                          {event.endDate
-                            ? ` – ${formatDate(event.endDate)}`
-                            : ""}
+                          <span className={styles.status}>
+                            {event.status || "—"}
+                          </span>
                         </td>
                         <td>{event.city || "—"}</td>
+                        <td>{event.location || "—"}</td>
+                        <td>{formatDate(event.endDate)}</td>
+                        <td className={styles.activityCell}>
+                          {event.activity || "—"}
+                        </td>
+                        <td>{event.area || "—"}</td>
+                        <td>{formatNumber(event.mediaPosting)}</td>
                         <td>{formatNumber(event.footTraffic)}</td>
                         <td>{formatNumber(event.testRide)}</td>
                         <td>{formatNumber(event.totalSpk)}</td>
-                        <td>{pct(event.testRideToSpk)}</td>
                         <td>{formatCurrency(event.totalBudget)}</td>
-                        <td>{formatCurrency(event.costPerSpk)}</td>
                         <td>
-                          {event.dataQuality.spkMatches &&
-                          event.dataQuality.budgetMatches ? (
-                            <span>✓ OK</span>
+                          {event.sppLink ? (
+                            <a
+                              className={styles.tableLink}
+                              href={event.sppLink}
+                              target="_blank"
+                              rel="noreferrer"
+                            >
+                              Open ↗
+                            </a>
                           ) : (
-                            <span className={styles.qualityWarn}>
-                              ⚠ Mismatch
-                            </span>
+                            "—"
                           )}
                         </td>
                         <td>
-                          <span
-                            className={
-                              event.status === "Completed"
-                                ? styles.completed
-                                : event.status === "Ongoing"
-                                  ? styles.ongoing
-                                  : styles.upcoming
-                            }
-                          >
-                            {event.status}
-                          </span>
-                        </td>
-                        <td>
-                          <button
-                            type="button"
-                            className={styles.viewButton}
-                            onClick={() => setSelected(event)}
-                          >
-                            View
-                          </button>
+                          {event.quotationLink ? (
+                            <a
+                              className={styles.tableLink}
+                              href={event.quotationLink}
+                              target="_blank"
+                              rel="noreferrer"
+                            >
+                              Open ↗
+                            </a>
+                          ) : (
+                            "—"
+                          )}
                         </td>
                       </tr>
                     ))
