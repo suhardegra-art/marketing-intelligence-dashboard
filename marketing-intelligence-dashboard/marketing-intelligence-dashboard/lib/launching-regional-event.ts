@@ -1,8 +1,10 @@
 import { getEventSheetData } from "@/lib/event-sheet-data";
 
 export const LAUNCHING_REGIONAL_SHEET_NAME =
-  "Launching Event Jakarta & Regio";
+  "Launching & Regional Event";
 
 export function getLaunchingRegionalEventData() {
-  return getEventSheetData(LAUNCHING_REGIONAL_SHEET_NAME);
+  return getEventSheetData(
+    LAUNCHING_REGIONAL_SHEET_NAME
+  );
 }

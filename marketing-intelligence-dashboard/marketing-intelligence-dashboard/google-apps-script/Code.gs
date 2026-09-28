@@ -2,17 +2,20 @@ const DEFAULT_SHEET_NAME = "Anual Big Event";
 
 const ALLOWED_SHEET_NAMES = [
   "Anual Big Event",
-  "Launching Event Jakarta & Regio",
+  "Launching & Regional Event",
   "Side Event"
 ];
 
 function doGet(e) {
   try {
     const expectedKey =
-      PropertiesService.getScriptProperties().getProperty("API_SECRET");
+      PropertiesService.getScriptProperties()
+        .getProperty("API_SECRET");
 
     const providedKey =
-      e && e.parameter ? String(e.parameter.key || "") : "";
+      e && e.parameter
+        ? String(e.parameter.key || "")
+        : "";
 
     if (!expectedKey || providedKey !== expectedKey) {
       return jsonResponse({
@@ -22,7 +25,9 @@ function doGet(e) {
     }
 
     const requestedSheet =
-      e && e.parameter ? String(e.parameter.sheet || "") : "";
+      e && e.parameter
+        ? String(e.parameter.sheet || "")
+        : "";
 
     const sheetName =
       requestedSheet &&
@@ -30,8 +35,11 @@ function doGet(e) {
         ? requestedSheet
         : DEFAULT_SHEET_NAME;
 
-    const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
-    const sheet = spreadsheet.getSheetByName(sheetName);
+    const spreadsheet =
+      SpreadsheetApp.getActiveSpreadsheet();
+
+    const sheet =
+      spreadsheet.getSheetByName(sheetName);
 
     if (!sheet) {
       return jsonResponse({
@@ -40,7 +48,8 @@ function doGet(e) {
       });
     }
 
-    const values = sheet.getDataRange().getDisplayValues();
+    const values =
+      sheet.getDataRange().getDisplayValues();
 
     const dataString = JSON.stringify(values);
 
@@ -52,7 +61,10 @@ function doGet(e) {
 
     const dataVersion = digest
       .map(function(byte) {
-        return ("0" + ((byte + 256) % 256).toString(16)).slice(-2);
+        return (
+          "0" +
+          ((byte + 256) % 256).toString(16)
+        ).slice(-2);
       })
       .join("");
 
@@ -67,9 +79,10 @@ function doGet(e) {
   } catch (error) {
     return jsonResponse({
       ok: false,
-      error: error && error.message
-        ? error.message
-        : String(error)
+      error:
+        error && error.message
+          ? error.message
+          : String(error)
     });
   }
 }
