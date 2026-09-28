@@ -57,22 +57,6 @@ function toIsoEventDate(value: unknown) {
   const raw = String(value ?? "").trim();
   if (!raw) return "";
 
-  // Excel / Sheets serial date if the API ever returns it as text.
-  if (/^\d{5}(?:\.\d+)?$/.test(raw)) {
-    const serial = Number(raw);
-
-    if (Number.isFinite(serial)) {
-      const epoch = Date.UTC(1899, 11, 30);
-      return new Date(
-        epoch + serial * 24 * 60 * 60 * 1000
-      )
-        .toISOString()
-        .slice(0, 10);
-    }
-  }
-
-  // Supports Indonesian and English month names:
-  // 6 Februari 2025, 19 Maret 2025, 13 February 2025.
   const match = raw.match(
     /^(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})$/i
   );
@@ -130,15 +114,25 @@ function normalizeEventDateCells(
       header === "tanggal selesai"
   );
 
-  for (let rowIndex = 1; rowIndex < cloned.length; rowIndex += 1) {
+  for (
+    let rowIndex = 1;
+    rowIndex < cloned.length;
+    rowIndex += 1
+  ) {
     const row = cloned[rowIndex];
 
-    if (startDateIndex >= 0 && row[startDateIndex] != null) {
+    if (
+      startDateIndex >= 0 &&
+      row[startDateIndex] != null
+    ) {
       row[startDateIndex] =
         toIsoEventDate(row[startDateIndex]);
     }
 
-    if (endDateIndex >= 0 && row[endDateIndex] != null) {
+    if (
+      endDateIndex >= 0 &&
+      row[endDateIndex] != null
+    ) {
       row[endDateIndex] =
         toIsoEventDate(row[endDateIndex]);
     }
@@ -177,13 +171,19 @@ function emptyData(
 export async function getEventSheetData(
   sheetName: string
 ): Promise<AnnualBigEventData> {
-  const apiUrl = process.env.ANNUAL_EVENT_SHEET_API_URL;
-  const secret = process.env.ANNUAL_EVENT_SHEET_API_SECRET;
+  // IMPORTANT:
+  // These pages use a SEPARATE Marketing Event Detail Report API.
+  // They do NOT use ANNUAL_EVENT_SHEET_API_URL.
+  const apiUrl =
+    process.env.MARKETING_EVENT_DETAIL_API_URL;
+
+  const secret =
+    process.env.MARKETING_EVENT_DETAIL_API_SECRET;
 
   if (!apiUrl || !secret) {
     return emptyData(
       sheetName,
-      "ANNUAL_EVENT_SHEET_API_URL and ANNUAL_EVENT_SHEET_API_SECRET are not configured."
+      "MARKETING_EVENT_DETAIL_API_URL and MARKETING_EVENT_DETAIL_API_SECRET are not configured."
     );
   }
 
@@ -194,34 +194,44 @@ export async function getEventSheetData(
     url.searchParams.set("sheet", sheetName);
     url.searchParams.set("_t", String(Date.now()));
 
-    const response = await fetch(url.toString(), {
-      cache: "no-store",
-      headers: {
-        Accept: "application/json"
+    const response = await fetch(
+      url.toString(),
+      {
+        cache: "no-store",
+        headers: {
+          Accept: "application/json"
+        }
       }
-    });
+    );
 
     const text = await response.text();
 
     let payload: SheetPayload;
 
     try {
-      payload = text ? JSON.parse(text) : {};
+      payload = text
+        ? JSON.parse(text)
+        : {};
     } catch {
       throw new Error(
-        `Google Sheet API returned non-JSON response (${response.status}).`
+        `Marketing Event Detail API returned non-JSON response (${response.status}).`
       );
     }
 
-    if (!response.ok || payload.ok === false) {
+    if (
+      !response.ok ||
+      payload.ok === false
+    ) {
       throw new Error(
         payload.error ||
-          `Google Sheet API returned HTTP ${response.status}.`
+          `Marketing Event Detail API returned HTTP ${response.status}.`
       );
     }
 
     const normalizedRows =
-      normalizeEventDateCells(payload.values || []);
+      normalizeEventDateCells(
+        payload.values || []
+      );
 
     return normalizeAnnualBigEventRows(
       normalizedRows,
@@ -230,11 +240,13 @@ export async function getEventSheetData(
           payload.spreadsheetName ||
           "Marketing Event Detail Report",
         sheetName:
-          payload.sheetName || sheetName,
+          payload.sheetName ||
+          sheetName,
         fetchedAt:
           payload.fetchedAt ||
           new Date().toISOString(),
-        dataVersion: payload.dataVersion
+        dataVersion:
+          payload.dataVersion
       }
     );
   } catch (error) {

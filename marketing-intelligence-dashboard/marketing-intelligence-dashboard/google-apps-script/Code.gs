@@ -1,7 +1,7 @@
-const DEFAULT_SHEET_NAME = "Anual Big Event";
+const SPREADSHEET_ID =
+  "1KEPkOSSS_5RV0RQw4RQpIdkz3fqxnB37MPhJnPCdcQg";
 
 const ALLOWED_SHEET_NAMES = [
-  "Anual Big Event",
   "Launching & Regional Event",
   "Side Event"
 ];
@@ -9,7 +9,8 @@ const ALLOWED_SHEET_NAMES = [
 function doGet(e) {
   try {
     const expectedKey =
-      PropertiesService.getScriptProperties()
+      PropertiesService
+        .getScriptProperties()
         .getProperty("API_SECRET");
 
     const providedKey =
@@ -17,7 +18,10 @@ function doGet(e) {
         ? String(e.parameter.key || "")
         : "";
 
-    if (!expectedKey || providedKey !== expectedKey) {
+    if (
+      !expectedKey ||
+      providedKey !== expectedKey
+    ) {
       return jsonResponse({
         ok: false,
         error: "Unauthorized"
@@ -29,52 +33,77 @@ function doGet(e) {
         ? String(e.parameter.sheet || "")
         : "";
 
-    const sheetName =
-      requestedSheet &&
-      ALLOWED_SHEET_NAMES.indexOf(requestedSheet) >= 0
-        ? requestedSheet
-        : DEFAULT_SHEET_NAME;
+    if (
+      ALLOWED_SHEET_NAMES.indexOf(
+        requestedSheet
+      ) < 0
+    ) {
+      return jsonResponse({
+        ok: false,
+        error:
+          'Invalid sheet. Allowed: "Launching & Regional Event" or "Side Event".'
+      });
+    }
 
+    // Always open the exact Marketing Event Detail Report
+    // spreadsheet supplied for these pages.
     const spreadsheet =
-      SpreadsheetApp.getActiveSpreadsheet();
+      SpreadsheetApp.openById(
+        SPREADSHEET_ID
+      );
 
     const sheet =
-      spreadsheet.getSheetByName(sheetName);
+      spreadsheet.getSheetByName(
+        requestedSheet
+      );
 
     if (!sheet) {
       return jsonResponse({
         ok: false,
-        error: `Sheet "${sheetName}" was not found.`
+        error:
+          `Sheet "${requestedSheet}" was not found in "${spreadsheet.getName()}".`
       });
     }
 
     const values =
-      sheet.getDataRange().getDisplayValues();
+      sheet
+        .getDataRange()
+        .getDisplayValues();
 
-    const dataString = JSON.stringify(values);
+    const dataString =
+      JSON.stringify(values);
 
-    const digest = Utilities.computeDigest(
-      Utilities.DigestAlgorithm.MD5,
-      dataString,
-      Utilities.Charset.UTF_8
-    );
+    const digest =
+      Utilities.computeDigest(
+        Utilities.DigestAlgorithm.MD5,
+        dataString,
+        Utilities.Charset.UTF_8
+      );
 
     const dataVersion = digest
       .map(function(byte) {
         return (
           "0" +
-          ((byte + 256) % 256).toString(16)
+          ((byte + 256) % 256)
+            .toString(16)
         ).slice(-2);
       })
       .join("");
 
     return jsonResponse({
       ok: true,
-      spreadsheetName: spreadsheet.getName(),
-      sheetName: sheetName,
-      fetchedAt: new Date().toISOString(),
-      dataVersion: dataVersion,
-      values: values
+      spreadsheetName:
+        spreadsheet.getName(),
+      spreadsheetId:
+        spreadsheet.getId(),
+      sheetName:
+        requestedSheet,
+      fetchedAt:
+        new Date().toISOString(),
+      dataVersion:
+        dataVersion,
+      values:
+        values
     });
   } catch (error) {
     return jsonResponse({
@@ -89,6 +118,10 @@ function doGet(e) {
 
 function jsonResponse(payload) {
   return ContentService
-    .createTextOutput(JSON.stringify(payload))
-    .setMimeType(ContentService.MimeType.JSON);
+    .createTextOutput(
+      JSON.stringify(payload)
+    )
+    .setMimeType(
+      ContentService.MimeType.JSON
+    );
 }
