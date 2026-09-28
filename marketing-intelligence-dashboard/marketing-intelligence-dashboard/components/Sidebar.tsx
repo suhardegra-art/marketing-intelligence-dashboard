@@ -58,6 +58,8 @@ function itemHref(item: string) {
   if (item === "YouTube") return "/youtube";
   if (item === "Auto Reply Comment") return "/auto-reply-comment";
   if (item === "Annual Big Event") return "/annual-big-event";
+  if (item === "Launching & Regional Event") return "/launching-regional-event";
+  if (item === "Side Event") return "/side-event";
   return null;
 }
 

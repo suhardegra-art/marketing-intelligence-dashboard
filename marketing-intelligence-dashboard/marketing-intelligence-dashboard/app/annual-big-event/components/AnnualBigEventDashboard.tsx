@@ -563,7 +563,7 @@ function csvEscape(value: string | number) {
 
 
 
-function exportCsv(events: AnnualBigEvent[]) {
+function exportCsv(events: AnnualBigEvent[], fileName = "annual-big-event-data.csv") {
 
   const header = [
 
@@ -659,7 +659,7 @@ function exportCsv(events: AnnualBigEvent[]) {
 
   anchor.href = url;
 
-  anchor.download = "annual-big-event-data.csv";
+  anchor.download = fileName;
 
   document.body.appendChild(anchor);
 
@@ -817,11 +817,19 @@ const PIE_COLORS = [
 
 export default function AnnualBigEventDashboard({
 
-  initialData
+  initialData,
+  pageTitle = "Annual Big Event",
+  dataApiPath = "/api/annual-big-event/data",
+  aiApiPath = "/api/annual-big-event/ai",
+  csvFileName = "annual-big-event-data.csv"
 
 }: {
 
   initialData: AnnualBigEventData;
+  pageTitle?: string;
+  dataApiPath?: string;
+  aiApiPath?: string;
+  csvFileName?: string;
 
 }) {
 
@@ -927,7 +935,7 @@ export default function AnnualBigEventDashboard({
 
         const response = await fetch(
 
-          "/api/annual-big-event/data",
+          dataApiPath,
 
           { cache: "no-store" }
 
@@ -983,7 +991,9 @@ export default function AnnualBigEventDashboard({
 
     initialData.dataVersion,
 
-    router
+    router,
+
+    dataApiPath
 
   ]);
 
@@ -1390,7 +1400,7 @@ export default function AnnualBigEventDashboard({
 
       const response = await fetch(
 
-        "/api/annual-big-event/data",
+        dataApiPath,
 
         { cache: "no-store" }
 
@@ -1456,7 +1466,7 @@ export default function AnnualBigEventDashboard({
 
       const response = await fetch(
 
-        "/api/annual-big-event/ai",
+        aiApiPath,
 
         { method: "POST" }
 
@@ -1602,7 +1612,7 @@ export default function AnnualBigEventDashboard({
 
         <div className={styles.title}>
 
-          <h1>Annual Big Event</h1>
+          <h1>{pageTitle}</h1>
 
           <p>
 
@@ -1804,7 +1814,7 @@ export default function AnnualBigEventDashboard({
 
                 type="button"
 
-                onClick={() => exportCsv(filteredEvents)}
+                onClick={() => exportCsv(filteredEvents, csvFileName)}
 
               >
 

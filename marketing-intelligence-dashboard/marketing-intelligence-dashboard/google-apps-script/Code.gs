@@ -1,4 +1,10 @@
-const SHEET_NAME = "Anual Big Event";
+const DEFAULT_SHEET_NAME = "Anual Big Event";
+
+const ALLOWED_SHEET_NAMES = [
+  "Anual Big Event",
+  "Launching Event Jakarta & Regio",
+  "Side Event"
+];
 
 function doGet(e) {
   try {
@@ -15,13 +21,22 @@ function doGet(e) {
       });
     }
 
+    const requestedSheet =
+      e && e.parameter ? String(e.parameter.sheet || "") : "";
+
+    const sheetName =
+      requestedSheet &&
+      ALLOWED_SHEET_NAMES.indexOf(requestedSheet) >= 0
+        ? requestedSheet
+        : DEFAULT_SHEET_NAME;
+
     const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
-    const sheet = spreadsheet.getSheetByName(SHEET_NAME);
+    const sheet = spreadsheet.getSheetByName(sheetName);
 
     if (!sheet) {
       return jsonResponse({
         ok: false,
-        error: `Sheet "${SHEET_NAME}" was not found.`
+        error: `Sheet "${sheetName}" was not found.`
       });
     }
 
@@ -44,7 +59,7 @@ function doGet(e) {
     return jsonResponse({
       ok: true,
       spreadsheetName: spreadsheet.getName(),
-      sheetName: SHEET_NAME,
+      sheetName: sheetName,
       fetchedAt: new Date().toISOString(),
       dataVersion: dataVersion,
       values: values
