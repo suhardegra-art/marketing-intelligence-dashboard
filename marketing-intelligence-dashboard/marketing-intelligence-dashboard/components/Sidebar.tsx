@@ -28,10 +28,9 @@ const groups = [
     label: "OFFLINE",
     items: [
       "Offline Overview",
-      "Launching Activity",
       "Annual Big Event",
-      "Side Event",
-      "Regional Event"
+      "Launching & Regional Event",
+      "Side Event"
     ]
   },
   {
