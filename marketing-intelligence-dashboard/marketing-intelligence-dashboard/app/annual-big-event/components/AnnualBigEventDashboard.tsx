@@ -1228,6 +1228,26 @@ export default function AnnualBigEventDashboard({
 
 
 
+  const modelDataTotal = useMemo(
+
+    () => modelData.reduce((sum, row) => sum + row.value, 0),
+
+    [modelData]
+
+  );
+
+
+
+  const budgetDataTotal = useMemo(
+
+    () => budgetData.reduce((sum, row) => sum + row.value, 0),
+
+    [budgetData]
+
+  );
+
+
+
   const cityData = useMemo(
 
     () => buildCityData(filteredEvents),
@@ -3118,80 +3138,131 @@ export default function AnnualBigEventDashboard({
 
 
 
-              <div className={styles.chartBox}>
+              <div
+                className={styles.chartBox}
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "minmax(150px, 0.9fr) minmax(180px, 1.1fr)",
+                  gap: 16,
+                  alignItems: "center"
+                }}
+              >
+                <div style={{ width: "100%", height: 205 }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={modelData}
+                        dataKey="value"
+                        nameKey="name"
+                        innerRadius={52}
+                        outerRadius={78}
+                        paddingAngle={2}
+                      >
+                        {modelData.map((row, index) => (
+                          <Cell
+                            key={row.name}
+                            fill={PIE_COLORS[index % PIE_COLORS.length]}
+                          />
+                        ))}
+                      </Pie>
 
-                <ResponsiveContainer
+                      <Tooltip
+                        formatter={(value: number | string) => [
+                          formatNumber(Number(value)),
+                          "SPK"
+                        ]}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
 
-                  width="100%"
+                <div style={{ minWidth: 0 }}>
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "baseline",
+                      justifyContent: "space-between",
+                      gap: 12,
+                      paddingBottom: 8,
+                      marginBottom: 6,
+                      borderBottom: "1px solid #eef1f6"
+                    }}
+                  >
+                    <span style={{ fontSize: 11, color: "#7f89a1" }}>Total SPK</span>
+                    <strong style={{ fontSize: 15, color: "#1d2942" }}>
+                      {formatNumber(modelDataTotal)}
+                    </strong>
+                  </div>
 
-                  height="100%"
+                  <div
+                    style={{
+                      display: "grid",
+                      gap: 7,
+                      maxHeight: 170,
+                      overflowY: "auto",
+                      paddingRight: 4
+                    }}
+                  >
+                    {modelData.length ? (
+                      modelData.map((row, index) => {
+                        const share = modelDataTotal
+                          ? (row.value / modelDataTotal) * 100
+                          : 0;
 
-                >
-
-                  <PieChart>
-
-                    <Pie
-
-                      data={modelData}
-
-                      dataKey="value"
-
-                      nameKey="name"
-
-                      innerRadius={54}
-
-                      outerRadius={82}
-
-                      paddingAngle={2}
-
-                    >
-
-                      {modelData.map((row, index) => (
-
-                        <Cell
-
-                          key={row.name}
-
-                          fill={
-
-                            PIE_COLORS[
-
-                              index % PIE_COLORS.length
-
-                            ]
-
-                          }
-
-                        />
-
-                      ))}
-
-                    </Pie>
-
-
-
-                    <Tooltip
-
-                      formatter={(
-
-                        value: number | string
-
-                      ) =>
-
-                        formatNumber(
-
-                          Number(value)
-
-                        )
-
-                      }
-
-                    />
-
-                  </PieChart>
-
-                </ResponsiveContainer>
-
+                        return (
+                          <div
+                            key={row.name}
+                            style={{
+                              display: "grid",
+                              gridTemplateColumns: "10px minmax(0, 1fr) auto",
+                              gap: 7,
+                              alignItems: "center"
+                            }}
+                          >
+                            <span
+                              style={{
+                                width: 8,
+                                height: 8,
+                                borderRadius: "50%",
+                                background: PIE_COLORS[index % PIE_COLORS.length]
+                              }}
+                            />
+                            <span
+                              title={row.name}
+                              style={{
+                                minWidth: 0,
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                                whiteSpace: "nowrap",
+                                fontSize: 10.5,
+                                color: "#59637b"
+                              }}
+                            >
+                              {row.name}
+                            </span>
+                            <span
+                              style={{
+                                textAlign: "right",
+                                fontSize: 10.5,
+                                color: "#26324b",
+                                whiteSpace: "nowrap"
+                              }}
+                            >
+                              <strong>{formatNumber(row.value)}</strong>{" "}
+                              <span style={{ color: "#8c95aa" }}>
+                                ({share.toFixed(1)}%)
+                              </span>
+                            </span>
+                          </div>
+                        );
+                      })
+                    ) : (
+                      <span style={{ fontSize: 11, color: "#8c95aa" }}>
+                        No SPK breakdown data.
+                      </span>
+                    )}
+                  </div>
+                </div>
               </div>
 
             </article>
@@ -3218,80 +3289,131 @@ export default function AnnualBigEventDashboard({
 
 
 
-              <div className={styles.chartBox}>
+              <div
+                className={styles.chartBox}
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "minmax(150px, 0.9fr) minmax(190px, 1.1fr)",
+                  gap: 16,
+                  alignItems: "center"
+                }}
+              >
+                <div style={{ width: "100%", height: 205 }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={budgetData}
+                        dataKey="value"
+                        nameKey="name"
+                        innerRadius={52}
+                        outerRadius={78}
+                        paddingAngle={2}
+                      >
+                        {budgetData.map((row, index) => (
+                          <Cell
+                            key={row.name}
+                            fill={PIE_COLORS[index % PIE_COLORS.length]}
+                          />
+                        ))}
+                      </Pie>
 
-                <ResponsiveContainer
+                      <Tooltip
+                        formatter={(value: number | string) => [
+                          formatCurrency(Number(value)),
+                          "Budget"
+                        ]}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
 
-                  width="100%"
+                <div style={{ minWidth: 0 }}>
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "baseline",
+                      justifyContent: "space-between",
+                      gap: 12,
+                      paddingBottom: 8,
+                      marginBottom: 6,
+                      borderBottom: "1px solid #eef1f6"
+                    }}
+                  >
+                    <span style={{ fontSize: 11, color: "#7f89a1" }}>Total Budget</span>
+                    <strong style={{ fontSize: 13, color: "#1d2942", textAlign: "right" }}>
+                      {formatCurrency(budgetDataTotal)}
+                    </strong>
+                  </div>
 
-                  height="100%"
+                  <div
+                    style={{
+                      display: "grid",
+                      gap: 7,
+                      maxHeight: 170,
+                      overflowY: "auto",
+                      paddingRight: 4
+                    }}
+                  >
+                    {budgetData.length ? (
+                      budgetData.map((row, index) => {
+                        const share = budgetDataTotal
+                          ? (row.value / budgetDataTotal) * 100
+                          : 0;
 
-                >
-
-                  <PieChart>
-
-                    <Pie
-
-                      data={budgetData}
-
-                      dataKey="value"
-
-                      nameKey="name"
-
-                      innerRadius={54}
-
-                      outerRadius={82}
-
-                      paddingAngle={2}
-
-                    >
-
-                      {budgetData.map((row, index) => (
-
-                        <Cell
-
-                          key={row.name}
-
-                          fill={
-
-                            PIE_COLORS[
-
-                              index % PIE_COLORS.length
-
-                            ]
-
-                          }
-
-                        />
-
-                      ))}
-
-                    </Pie>
-
-
-
-                    <Tooltip
-
-                      formatter={(
-
-                        value: number | string
-
-                      ) =>
-
-                        formatCurrency(
-
-                          Number(value)
-
-                        )
-
-                      }
-
-                    />
-
-                  </PieChart>
-
-                </ResponsiveContainer>
-
+                        return (
+                          <div
+                            key={row.name}
+                            style={{
+                              display: "grid",
+                              gridTemplateColumns: "10px minmax(0, 1fr) auto",
+                              gap: 7,
+                              alignItems: "center"
+                            }}
+                          >
+                            <span
+                              style={{
+                                width: 8,
+                                height: 8,
+                                borderRadius: "50%",
+                                background: PIE_COLORS[index % PIE_COLORS.length]
+                              }}
+                            />
+                            <span
+                              title={row.name}
+                              style={{
+                                minWidth: 0,
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                                whiteSpace: "nowrap",
+                                fontSize: 10,
+                                color: "#59637b"
+                              }}
+                            >
+                              {row.name}
+                            </span>
+                            <span
+                              style={{
+                                textAlign: "right",
+                                fontSize: 9.5,
+                                color: "#26324b",
+                                whiteSpace: "nowrap"
+                              }}
+                            >
+                              <strong>{formatCompact(row.value)}</strong>{" "}
+                              <span style={{ color: "#8c95aa" }}>
+                                ({share.toFixed(1)}%)
+                              </span>
+                            </span>
+                          </div>
+                        );
+                      })
+                    ) : (
+                      <span style={{ fontSize: 11, color: "#8c95aa" }}>
+                        No budget breakdown data.
+                      </span>
+                    )}
+                  </div>
+                </div>
               </div>
 
             </article>
