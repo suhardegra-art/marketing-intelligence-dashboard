@@ -1,0 +1,481 @@
+import { createHash, timingSafeEqual } from "crypto";
+import { NextRequest, NextResponse } from "next/server";
+
+import {
+  autoReplySupabaseRequest,
+  writeAutoReplyActivity
+} from "@/lib/auto-reply-comments";
+
+import {
+  generateCustomerServiceDraft
+} from "@/lib/auto-reply-ai";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+type Payload = Record<string, any>;
+
+function str(value: unknown) {
+  if (typeof value === "string") return value.trim();
+  if (typeof value === "number") return String(value);
+  return "";
+}
+
+function obj(value: unknown): Record<string, any> {
+  if (
+    value &&
+    typeof value === "object" &&
+    !Array.isArray(value)
+  ) {
+    return value as Record<string, any>;
+  }
+
+  if (typeof value === "string") {
+    try {
+      const parsed = JSON.parse(value);
+
+      if (
+        parsed &&
+        typeof parsed === "object" &&
+        !Array.isArray(parsed)
+      ) {
+        return parsed as Record<string, any>;
+      }
+    } catch {
+      return {};
+    }
+  }
+
+  return {};
+}
+
+function secureEqual(left: string, right: string) {
+  const a = Buffer.from(left);
+  const b = Buffer.from(right);
+
+  if (a.length !== b.length) return false;
+
+  return timingSafeEqual(a, b);
+}
+
+function authorized(request: NextRequest) {
+  const expected =
+    process.env.MANYCHAT_WEBHOOK_SECRET?.trim();
+
+  if (!expected) {
+    throw new Error(
+      "MANYCHAT_WEBHOOK_SECRET is not configured."
+    );
+  }
+
+  const received =
+    request.headers.get("x-manychat-secret")?.trim() || "";
+
+  return secureEqual(received, expected);
+}
+
+function fallbackEventId(input: {
+  contactId: string;
+  contentId: string;
+  text: string;
+}) {
+  return createHash("sha256")
+    .update(
+      `${input.contactId}|${input.contentId}|${input.text}`
+    )
+    .digest("hex")
+    .slice(0, 24);
+}
+
+async function findExisting(
+  platform: string,
+  platformCommentId: string
+) {
+  const rows =
+    (await autoReplySupabaseRequest(
+      `/rest/v1/social_comments?platform=eq.${encodeURIComponent(
+        platform
+      )}&platform_comment_id=eq.${encodeURIComponent(
+        platformCommentId
+      )}&select=id,status&limit=1`
+    )) as Array<{ id: string; status: string }>;
+
+  return rows[0] || null;
+}
+
+function buildManyChatLinkNote(
+  contactId: string,
+  inboxUrl: string | null
+) {
+  return [
+    `ManyChat contact: ${contactId}`,
+    inboxUrl ? `Inbox: ${inboxUrl}` : null
+  ]
+    .filter(Boolean)
+    .join(" • ");
+}
+
+async function linkRecentMatchingPendingItem(input: {
+  platform: string;
+  commentText: string;
+  displayName: string | null;
+  username: string | null;
+  contactId: string;
+  inboxUrl: string | null;
+}) {
+  if (
+    !input.contactId ||
+    (!input.displayName && !input.username)
+  ) {
+    return null;
+  }
+
+  const rows =
+    (await autoReplySupabaseRequest(
+      `/rest/v1/social_comments?platform=eq.${encodeURIComponent(
+        input.platform
+      )}&status=in.(PENDING_APPROVAL,AI_DRAFTED)&comment_text=eq.${encodeURIComponent(
+        input.commentText
+      )}&select=id,status,user_display_name,username,created_at&order=created_at.desc&limit=20`
+    )) as Array<{
+      id: string;
+      status: string;
+      user_display_name: string | null;
+      username: string | null;
+      created_at: string;
+    }>;
+
+  const normalizedName =
+    input.displayName?.trim().toLowerCase() || null;
+
+  const normalizedUsername =
+    input.username?.trim().toLowerCase() || null;
+
+  const match = rows.find((row) => {
+    const rowName =
+      row.user_display_name?.trim().toLowerCase() || null;
+
+    const rowUsername =
+      row.username?.trim().toLowerCase() || null;
+
+    if (
+      normalizedUsername &&
+      rowUsername &&
+      normalizedUsername === rowUsername
+    ) {
+      return true;
+    }
+
+    if (
+      normalizedName &&
+      rowName &&
+      normalizedName === rowName
+    ) {
+      return true;
+    }
+
+    return false;
+  });
+
+  if (!match) {
+    return null;
+  }
+
+  await writeAutoReplyActivity(
+    match.id,
+    "MANYCHAT_CONTACT_LINKED",
+    "ManyChat Collector",
+    buildManyChatLinkNote(
+      input.contactId,
+      input.inboxUrl
+    )
+  );
+
+  return match;
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    if (!authorized(request)) {
+      return NextResponse.json(
+        { error: "Invalid ManyChat secret." },
+        { status: 401 }
+      );
+    }
+
+    const body = (await request.json()) as Payload;
+
+    /*
+      ManyChat "Add Full Contact Data" sends the contact JSON directly
+      as the TOP-LEVEL request body. Support both that shape and wrapped shapes.
+    */
+    const directContactBody =
+      body.id ||
+      body.key ||
+      body.last_input_text ||
+      body.live_chat_url
+        ? body
+        : null;
+
+    const fullContact = obj(
+      body.full_contact_data ??
+        body.contact ??
+        body.contact_data ??
+        directContactBody
+    );
+
+    const customFields = obj(
+      body.custom_fields ??
+        fullContact.custom_fields
+    );
+
+    const platform =
+      str(body.platform).toLowerCase() || "instagram";
+
+    const contactId = str(
+      body.manychat_contact_id ??
+        body.contact_id ??
+        body.subscriber_id ??
+        body.id ??
+        fullContact.id
+    );
+
+    const displayName =
+      str(
+        body.display_name ??
+          body.name ??
+          fullContact.name ??
+          fullContact.first_name
+      ) || null;
+
+    const username =
+      str(
+        body.username ??
+          body.instagram_username ??
+          customFields.instagram_username ??
+          customFields.username
+      ) || null;
+
+    const commentText = str(
+      body.comment_text ??
+        body.text ??
+        body.last_input_text ??
+        fullContact.last_input_text
+    );
+
+    if (!commentText) {
+      return NextResponse.json(
+        {
+          error:
+            "No comment/message text received. Map the trigger text to comment_text or send Full Contact Data."
+        },
+        { status: 400 }
+      );
+    }
+
+    const createdAt =
+      str(
+        body.comment_created_at ??
+          body.created_at ??
+          body.timestamp ??
+          body.last_interaction ??
+          fullContact.last_interaction
+      ) || new Date().toISOString();
+
+    const inboxUrl =
+      str(
+        body.inbox_url ??
+          body.live_chat_url ??
+          fullContact.live_chat_url
+      ) || null;
+
+    const platformContentId =
+      str(
+        body.platform_content_id ??
+          body.content_id ??
+          body.post_id
+      );
+
+    /*
+      Repair older Phase-1 records:
+      match same pending text + same contact name/username, then link contact ID.
+    */
+    const relinked =
+      await linkRecentMatchingPendingItem({
+        platform,
+        commentText,
+        displayName,
+        username,
+        contactId,
+        inboxUrl
+      });
+
+    if (relinked) {
+      return NextResponse.json({
+        ok: true,
+        relinked: true,
+        duplicate: true,
+        commentId: relinked.id,
+        status: relinked.status,
+        contactLinked: Boolean(contactId),
+        manyChatContactId: contactId || null
+      });
+    }
+
+    const platformCommentId =
+      str(
+        body.platform_comment_id ??
+          body.comment_id ??
+          body.event_id
+      ) ||
+      `manychat-${contactId || "unknown"}-${fallbackEventId({
+        contactId: contactId || "unknown",
+        contentId: platformContentId || "direct-message",
+        text: commentText
+      })}`;
+
+    const existing = await findExisting(
+      platform,
+      platformCommentId
+    );
+
+    if (existing) {
+      if (contactId) {
+        await writeAutoReplyActivity(
+          existing.id,
+          "MANYCHAT_CONTACT_LINKED",
+          "ManyChat Collector",
+          buildManyChatLinkNote(
+            contactId,
+            inboxUrl
+          )
+        );
+      }
+
+      return NextResponse.json({
+        ok: true,
+        duplicate: true,
+        commentId: existing.id,
+        status: existing.status,
+        contactLinked: Boolean(contactId),
+        manyChatContactId: contactId || null
+      });
+    }
+
+    const draft = await generateCustomerServiceDraft({
+      platform,
+      customerName: displayName,
+      username,
+      commentText
+    });
+
+    if (!draft.draftReply) {
+      throw new Error("AI draft is empty.");
+    }
+
+    const commentRows =
+      (await autoReplySupabaseRequest(
+        "/rest/v1/social_comments",
+        {
+          method: "POST",
+          headers: {
+            Prefer: "return=representation"
+          },
+          body: JSON.stringify({
+            platform,
+            account_key:
+              str(body.account_key) || "indomobil-emotor",
+            platform_comment_id: platformCommentId,
+            platform_content_id:
+              platformContentId || null,
+            username,
+            user_display_name: displayName,
+            comment_text: commentText,
+            comment_url:
+              str(body.comment_url) || null,
+            comment_created_at: createdAt,
+            intent: draft.intent,
+            sentiment: draft.sentiment.toLowerCase(),
+            priority:
+              draft.priority === "HIGH"
+                ? "urgent"
+                : "normal",
+            ai_confidence: draft.confidence,
+            status: "PENDING_APPROVAL",
+            updated_at: new Date().toISOString()
+          })
+        }
+      )) as Array<{ id: string }>;
+
+    const commentId = commentRows[0]?.id;
+
+    if (!commentId) {
+      throw new Error(
+        "Supabase did not return a comment ID."
+      );
+    }
+
+    await autoReplySupabaseRequest(
+      "/rest/v1/social_comment_replies",
+      {
+        method: "POST",
+        headers: {
+          Prefer: "return=minimal"
+        },
+        body: JSON.stringify({
+          comment_id: commentId,
+          ai_draft: draft.draftReply,
+          final_reply: null,
+          ai_model: draft.model,
+          ai_confidence: draft.confidence,
+          error_message: null,
+          updated_at: new Date().toISOString()
+        })
+      }
+    );
+
+    await writeAutoReplyActivity(
+      commentId,
+      "AI_DRAFTED",
+      "Vercel AI",
+      [
+        draft.needsConfirmation
+          ? "Needs information confirmation."
+          : "Draft generated for human approval.",
+        draft.note || null,
+        contactId
+          ? `ManyChat contact: ${contactId}`
+          : null,
+        inboxUrl ? `Inbox: ${inboxUrl}` : null
+      ]
+        .filter(Boolean)
+        .join(" • ")
+    );
+
+    return NextResponse.json({
+      ok: true,
+      commentId,
+      status: "PENDING_APPROVAL",
+      approvalRequired: true,
+      draftGenerated: true,
+      needsConfirmation: draft.needsConfirmation,
+      contactLinked: Boolean(contactId),
+      manyChatContactId: contactId || null
+    });
+  } catch (error) {
+    console.error(
+      "ManyChat inbound AI draft error",
+      error
+    );
+
+    return NextResponse.json(
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : "Unable to create AI draft."
+      },
+      { status: 500 }
+    );
+  }
+}
