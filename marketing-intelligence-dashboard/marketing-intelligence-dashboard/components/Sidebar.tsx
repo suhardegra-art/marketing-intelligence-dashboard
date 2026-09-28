@@ -33,22 +33,6 @@ const groups = [
       "Side Event",
       "Report Media"
     ]
-  },
-  {
-    label: "AI INTELLIGENCE",
-    items: [
-      "AI Summary",
-      "Recommendations",
-      "Performance Alert"
-    ]
-  },
-  {
-    label: "DATA",
-    items: [
-      "Upload Data",
-      "Data Sources",
-      "Master Data"
-    ]
   }
 ];
 
@@ -58,6 +42,7 @@ function itemHref(item: string) {
   if (item === "TikTok Live") return "/tiktok-live";
   if (item === "YouTube") return "/youtube";
   if (item === "Auto Reply Comment") return "/auto-reply-comment";
+  if (item === "Offline Overview") return "/offline-overview";
   if (item === "Annual Big Event") return "/annual-big-event";
   if (item === "Launching & Regional Event") return "/launching-regional-event";
   if (item === "Side Event") return "/side-event";
