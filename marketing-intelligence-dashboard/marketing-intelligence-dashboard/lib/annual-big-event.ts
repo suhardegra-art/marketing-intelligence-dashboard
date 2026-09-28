@@ -24,6 +24,7 @@ export type AnnualBigEvent = {
   totalBudget: number;
   sppLink: string | null;
   quotationLink: string | null;
+  documentationLink: string | null;
   spkBreakdown: AnnualEventSpkItem[];
   budgetBreakdown: AnnualEventBudgetItem[];
   spkBreakdownTotal: number;
@@ -204,7 +205,8 @@ export function normalizeAnnualBigEventRows(
     spkLabel: headerIndex(headerRow, ["spk"]),
     budgetLabel: headerIndex(headerRow, ["budget"]),
     sppLink: headerIndex(headerRow, ["spp link"]),
-    quotation: headerIndex(headerRow, ["quotation"])
+    quotation: headerIndex(headerRow, ["quotation"]),
+    documentation: headerIndex(headerRow, ["dokumentasi", "documentation"])
   };
 
   const required = [ix.eventName, ix.spkLabel, ix.budgetLabel];
@@ -302,6 +304,10 @@ export function normalizeAnnualBigEventRows(
         quotationLink:
           ix.quotation >= 0 && safeString(row[ix.quotation])
             ? safeString(row[ix.quotation])
+            : null,
+        documentationLink:
+          ix.documentation >= 0 && safeString(row[ix.documentation])
+            ? safeString(row[ix.documentation])
             : null,
         spkBreakdown: [],
         budgetBreakdown: [],
