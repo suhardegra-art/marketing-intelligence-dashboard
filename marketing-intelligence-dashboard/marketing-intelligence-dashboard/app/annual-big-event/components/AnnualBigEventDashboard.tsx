@@ -92,6 +92,185 @@ type AIAnalysis = {
 
 
 
+type SortDirection = "asc" | "desc";
+
+type EventSortKey =
+  | "startDate"
+  | "eventName"
+  | "status"
+  | "city"
+  | "location"
+  | "endDate"
+  | "activity"
+  | "area"
+  | "mediaPosting"
+  | "footTraffic"
+  | "testRide"
+  | "spk"
+  | "budget";
+
+type SortKind = "text" | "date" | "number" | "area";
+
+const EVENTS_PER_PAGE = 10;
+
+function defaultDirection(kind: SortKind): SortDirection {
+  return kind === "number" || kind === "area" ? "desc" : "asc";
+}
+
+function compareText(
+  a: string | null | undefined,
+  b: string | null | undefined,
+  direction: SortDirection
+) {
+  const result = String(a || "").localeCompare(
+    String(b || ""),
+    undefined,
+    {
+      sensitivity: "base",
+      numeric: true
+    }
+  );
+
+  return direction === "asc" ? result : -result;
+}
+
+function compareNumber(
+  a: number,
+  b: number,
+  direction: SortDirection
+) {
+  const result = Number(a || 0) - Number(b || 0);
+  return direction === "asc" ? result : -result;
+}
+
+function dateValue(value: string) {
+  if (!value) return 0;
+
+  const iso = value.slice(0, 10);
+  const time = Date.parse(`${iso}T00:00:00Z`);
+
+  return Number.isFinite(time) ? time : 0;
+}
+
+function compareDate(
+  a: string,
+  b: string,
+  direction: SortDirection
+) {
+  const result = dateValue(a) - dateValue(b);
+  return direction === "asc" ? result : -result;
+}
+
+function areaValue(value: string) {
+  const match = String(value || "")
+    .replace(/,/g, ".")
+    .match(/-?\d+(?:\.\d+)?/);
+
+  return match ? Number(match[0]) : Number.NaN;
+}
+
+function compareArea(
+  a: string,
+  b: string,
+  direction: SortDirection
+) {
+  const aNumber = areaValue(a);
+  const bNumber = areaValue(b);
+
+  if (
+    Number.isFinite(aNumber) &&
+    Number.isFinite(bNumber)
+  ) {
+    const result = aNumber - bNumber;
+    return direction === "asc" ? result : -result;
+  }
+
+  return compareText(a, b, direction);
+}
+
+function sortIndicator(
+  kind: SortKind,
+  direction: SortDirection
+) {
+  if (kind === "text") {
+    return direction === "asc" ? "A-Z" : "Z-A";
+  }
+
+  if (kind === "date") {
+    return direction === "asc" ? "Old-New" : "New-Old";
+  }
+
+  return direction === "asc" ? "Low-High" : "High-Low";
+}
+
+function SortHeader({
+  label,
+  sortKey,
+  kind,
+  activeKey,
+  direction,
+  onSort,
+  minWidth = 110
+}: {
+  label: string;
+  sortKey: EventSortKey;
+  kind: SortKind;
+  activeKey: EventSortKey;
+  direction: SortDirection;
+  onSort: (key: EventSortKey, kind: SortKind) => void;
+  minWidth?: number;
+}) {
+  const active = activeKey === sortKey;
+
+  return (
+    <th
+      style={{
+        minWidth,
+        verticalAlign: "middle",
+        whiteSpace: "nowrap"
+      }}
+    >
+      <button
+        type="button"
+        onClick={() => onSort(sortKey, kind)}
+        title={`Sort ${label}`}
+        aria-label={`Sort ${label}`}
+        style={{
+          width: "100%",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 7,
+          padding: 0,
+          border: 0,
+          background: "transparent",
+          color: "inherit",
+          font: "inherit",
+          fontWeight: active ? 900 : 800,
+          cursor: "pointer",
+          textTransform: "inherit",
+          letterSpacing: "inherit"
+        }}
+      >
+        <span>{label}</span>
+        <span
+          style={{
+            flex: "0 0 auto",
+            color: active ? "#3159d7" : "#9aa4bb",
+            fontSize: active ? 8 : 11,
+            fontWeight: 900,
+            textTransform: "none",
+            letterSpacing: 0
+          }}
+        >
+          {active ? sortIndicator(kind, direction) : "↕"}
+        </span>
+      </button>
+    </th>
+  );
+}
+
+
 
 type LinkAvailability = "ALL" | "AVAILABLE" | "MISSING";
 
@@ -858,6 +1037,15 @@ export default function AnnualBigEventDashboard({
 
   const [status, setStatus] = useState("ALL");
 
+  const [sortKey, setSortKey] =
+    useState<EventSortKey>("startDate");
+
+  const [sortDirection, setSortDirection] =
+    useState<SortDirection>("asc");
+
+  const [currentPage, setCurrentPage] =
+    useState(1);
+
   const [columnFilters, setColumnFilters] = useState<ColumnFilters>(() => ({
     ...EMPTY_COLUMN_FILTERS
   }));
@@ -1088,7 +1276,8 @@ export default function AnnualBigEventDashboard({
           event.eventName,
           event.city,
           event.location,
-          event.activity
+          event.activity,
+          event.area
         ].some((value) =>
           String(value || "")
             .toLowerCase()
@@ -1104,62 +1293,11 @@ export default function AnnualBigEventDashboard({
       const matchesStatus =
         status === "ALL" || event.status === status;
 
-      const matchesColumnFilters =
-        matchesDateRange(
-          event.startDate,
-          columnFilters.startDateFrom,
-          columnFilters.startDateTo
-        ) &&
-        matchesText(event.eventName, columnFilters.eventName) &&
-        matchesText(event.location, columnFilters.location) &&
-        matchesDateRange(
-          event.endDate,
-          columnFilters.endDateFrom,
-          columnFilters.endDateTo
-        ) &&
-        matchesText(event.activity, columnFilters.activity) &&
-        matchesText(event.area, columnFilters.area) &&
-        matchesNumberRange(
-          event.mediaPosting,
-          columnFilters.mediaPostingMin,
-          columnFilters.mediaPostingMax
-        ) &&
-        matchesNumberRange(
-          event.footTraffic,
-          columnFilters.footTrafficMin,
-          columnFilters.footTrafficMax
-        ) &&
-        matchesNumberRange(
-          event.testRide,
-          columnFilters.testRideMin,
-          columnFilters.testRideMax
-        ) &&
-        matchesNumberRange(
-          event.totalSpk,
-          columnFilters.spkMin,
-          columnFilters.spkMax
-        ) &&
-        matchesNumberRange(
-          event.totalBudget,
-          columnFilters.budgetMin,
-          columnFilters.budgetMax
-        ) &&
-        matchesAvailability(event.sppLink, columnFilters.spp) &&
-        matchesAvailability(
-          event.quotationLink,
-          columnFilters.quotation
-        ) &&
-        matchesAvailability(
-          event.documentationLink,
-          columnFilters.documentation
-        );
-
       return (
         matchesSearch &&
         matchesYear &&
         matchesCity &&
-        matchesStatus &&
-        matchesColumnFilters
+        matchesStatus
       );
     });
   }, [
@@ -1167,8 +1305,203 @@ export default function AnnualBigEventDashboard({
     search,
     year,
     city,
-    status,
-    columnFilters
+    status
+  ]);
+
+  function handleSort(
+    key: EventSortKey,
+    kind: SortKind
+  ) {
+    setCurrentPage(1);
+
+    if (sortKey === key) {
+      setSortDirection((current) =>
+        current === "asc" ? "desc" : "asc"
+      );
+      return;
+    }
+
+    setSortKey(key);
+    setSortDirection(defaultDirection(kind));
+  }
+
+  const sortedEvents = useMemo(() => {
+    const rows = [...filteredEvents];
+
+    rows.sort((a, b) => {
+      switch (sortKey) {
+        case "startDate":
+          return compareDate(
+            a.startDate,
+            b.startDate,
+            sortDirection
+          );
+
+        case "eventName":
+          return compareText(
+            a.eventName,
+            b.eventName,
+            sortDirection
+          );
+
+        case "status":
+          return compareText(
+            a.status,
+            b.status,
+            sortDirection
+          );
+
+        case "city":
+          return compareText(
+            a.city,
+            b.city,
+            sortDirection
+          );
+
+        case "location":
+          return compareText(
+            a.location,
+            b.location,
+            sortDirection
+          );
+
+        case "endDate":
+          return compareDate(
+            a.endDate,
+            b.endDate,
+            sortDirection
+          );
+
+        case "activity":
+          return compareText(
+            a.activity,
+            b.activity,
+            sortDirection
+          );
+
+        case "area":
+          return compareArea(
+            a.area,
+            b.area,
+            sortDirection
+          );
+
+        case "mediaPosting":
+          return compareNumber(
+            a.mediaPosting,
+            b.mediaPosting,
+            sortDirection
+          );
+
+        case "footTraffic":
+          return compareNumber(
+            a.footTraffic,
+            b.footTraffic,
+            sortDirection
+          );
+
+        case "testRide":
+          return compareNumber(
+            a.testRide,
+            b.testRide,
+            sortDirection
+          );
+
+        case "spk":
+          return compareNumber(
+            a.totalSpk,
+            b.totalSpk,
+            sortDirection
+          );
+
+        case "budget":
+          return compareNumber(
+            a.totalBudget,
+            b.totalBudget,
+            sortDirection
+          );
+
+        default:
+          return 0;
+      }
+    });
+
+    return rows;
+  }, [
+    filteredEvents,
+    sortKey,
+    sortDirection
+  ]);
+
+  const totalPages = Math.max(
+    1,
+    Math.ceil(
+      sortedEvents.length /
+        EVENTS_PER_PAGE
+    )
+  );
+
+  const pagedEvents = useMemo(() => {
+    const start =
+      (currentPage - 1) *
+      EVENTS_PER_PAGE;
+
+    return sortedEvents.slice(
+      start,
+      start + EVENTS_PER_PAGE
+    );
+  }, [
+    sortedEvents,
+    currentPage
+  ]);
+
+  const pageNumbers = useMemo(() => {
+    const maxVisible = 6;
+
+    if (totalPages <= maxVisible) {
+      return Array.from(
+        { length: totalPages },
+        (_, index) => index + 1
+      );
+    }
+
+    let start = Math.max(
+      1,
+      currentPage - 2
+    );
+
+    let end = start + maxVisible - 1;
+
+    if (end > totalPages) {
+      end = totalPages;
+      start = end - maxVisible + 1;
+    }
+
+    return Array.from(
+      { length: end - start + 1 },
+      (_, index) => start + index
+    );
+  }, [
+    currentPage,
+    totalPages
+  ]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [
+    search,
+    year,
+    city,
+    status
+  ]);
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [
+    currentPage,
+    totalPages
   ]);
 
   function columnFilterIsActive(key: ColumnFilterKey) {
@@ -1827,7 +2160,7 @@ export default function AnnualBigEventDashboard({
 
                 type="button"
 
-                onClick={() => exportCsv(filteredEvents, csvFileName)}
+                onClick={() => exportCsv(sortedEvents, csvFileName)}
 
               >
 
@@ -1960,6 +2293,9 @@ export default function AnnualBigEventDashboard({
                   setYear("ALL");
                   setCity("ALL");
                   setStatus("ALL");
+                  setSortKey("startDate");
+                  setSortDirection("asc");
+                  setCurrentPage(1);
                   setColumnFilters({
                     ...EMPTY_COLUMN_FILTERS
                   });
@@ -1981,373 +2317,156 @@ export default function AnnualBigEventDashboard({
               <table className={styles.table}>
 
                 <thead>
-                <tr>
-                  <FilterHeader
-                    label="Tanggal"
-                    active={columnFilterIsActive("startDate")}
-                    open={openColumnFilter === "startDate"}
-                    onToggle={() => toggleColumnFilter("startDate")}
-                    minWidth={138}
-                  >
-                    <DateRangeFilterControl
-                      from={columnFilters.startDateFrom}
-                      to={columnFilters.startDateTo}
-                      onFromChange={(value) =>
-                        updateColumnFilter("startDateFrom", value)
-                      }
-                      onToChange={(value) =>
-                        updateColumnFilter("startDateTo", value)
-                      }
-                      onClear={() => {
-                        updateColumnFilter("startDateFrom", "");
-                        updateColumnFilter("startDateTo", "");
-                      }}
+                  <tr>
+                    <SortHeader
+                      label="Tanggal"
+                      sortKey="startDate"
+                      kind="date"
+                      activeKey={sortKey}
+                      direction={sortDirection}
+                      onSort={handleSort}
+                      minWidth={138}
                     />
-                  </FilterHeader>
 
-                  <FilterHeader
-                    label="Nama Event"
-                    active={columnFilterIsActive("eventName")}
-                    open={openColumnFilter === "eventName"}
-                    onToggle={() => toggleColumnFilter("eventName")}
-                    minWidth={190}
-                  >
-                    <TextFilterControl
-                      value={columnFilters.eventName}
-                      onChange={(value) =>
-                        updateColumnFilter("eventName", value)
-                      }
-                      onClear={() =>
-                        updateColumnFilter("eventName", "")
-                      }
-                      placeholder="Search event..."
+                    <SortHeader
+                      label="Nama Event"
+                      sortKey="eventName"
+                      kind="text"
+                      activeKey={sortKey}
+                      direction={sortDirection}
+                      onSort={handleSort}
+                      minWidth={190}
                     />
-                  </FilterHeader>
 
-                  <FilterHeader
-                    label="Status"
-                    active={columnFilterIsActive("status")}
-                    open={openColumnFilter === "status"}
-                    onToggle={() => toggleColumnFilter("status")}
-                    minWidth={118}
-                  >
-                    <SelectFilterControl
-                      value={status}
-                      onChange={setStatus}
-                      allLabel="All Status"
-                      options={statuses.map((value) => ({
-                        value,
-                        label: value
-                      }))}
+                    <SortHeader
+                      label="Status"
+                      sortKey="status"
+                      kind="text"
+                      activeKey={sortKey}
+                      direction={sortDirection}
+                      onSort={handleSort}
+                      minWidth={118}
                     />
-                  </FilterHeader>
 
-                  <FilterHeader
-                    label="Kota"
-                    active={columnFilterIsActive("city")}
-                    open={openColumnFilter === "city"}
-                    onToggle={() => toggleColumnFilter("city")}
-                    minWidth={122}
-                  >
-                    <SelectFilterControl
-                      value={city}
-                      onChange={setCity}
-                      allLabel="All Cities"
-                      options={cities.map((value) => ({
-                        value,
-                        label: value
-                      }))}
+                    <SortHeader
+                      label="Kota"
+                      sortKey="city"
+                      kind="text"
+                      activeKey={sortKey}
+                      direction={sortDirection}
+                      onSort={handleSort}
+                      minWidth={122}
                     />
-                  </FilterHeader>
 
-                  <FilterHeader
-                    label="Location"
-                    active={columnFilterIsActive("location")}
-                    open={openColumnFilter === "location"}
-                    onToggle={() => toggleColumnFilter("location")}
-                    minWidth={175}
-                  >
-                    <TextFilterControl
-                      value={columnFilters.location}
-                      onChange={(value) =>
-                        updateColumnFilter("location", value)
-                      }
-                      onClear={() =>
-                        updateColumnFilter("location", "")
-                      }
-                      placeholder="Search location..."
+                    <SortHeader
+                      label="Location"
+                      sortKey="location"
+                      kind="text"
+                      activeKey={sortKey}
+                      direction={sortDirection}
+                      onSort={handleSort}
+                      minWidth={175}
                     />
-                  </FilterHeader>
 
-                  <FilterHeader
-                    label="Finished Event"
-                    active={columnFilterIsActive("endDate")}
-                    open={openColumnFilter === "endDate"}
-                    onToggle={() => toggleColumnFilter("endDate")}
-                    minWidth={145}
-                  >
-                    <DateRangeFilterControl
-                      from={columnFilters.endDateFrom}
-                      to={columnFilters.endDateTo}
-                      onFromChange={(value) =>
-                        updateColumnFilter("endDateFrom", value)
-                      }
-                      onToChange={(value) =>
-                        updateColumnFilter("endDateTo", value)
-                      }
-                      onClear={() => {
-                        updateColumnFilter("endDateFrom", "");
-                        updateColumnFilter("endDateTo", "");
-                      }}
+                    <SortHeader
+                      label="Finished Event"
+                      sortKey="endDate"
+                      kind="date"
+                      activeKey={sortKey}
+                      direction={sortDirection}
+                      onSort={handleSort}
+                      minWidth={145}
                     />
-                  </FilterHeader>
 
-                  <FilterHeader
-                    label="Activity"
-                    active={columnFilterIsActive("activity")}
-                    open={openColumnFilter === "activity"}
-                    onToggle={() => toggleColumnFilter("activity")}
-                    minWidth={210}
-                  >
-                    <TextFilterControl
-                      value={columnFilters.activity}
-                      onChange={(value) =>
-                        updateColumnFilter("activity", value)
-                      }
-                      onClear={() =>
-                        updateColumnFilter("activity", "")
-                      }
-                      placeholder="Search activity..."
+                    <SortHeader
+                      label="Activity"
+                      sortKey="activity"
+                      kind="text"
+                      activeKey={sortKey}
+                      direction={sortDirection}
+                      onSort={handleSort}
+                      minWidth={210}
                     />
-                  </FilterHeader>
 
-                  <FilterHeader
-                    label="Luas Lahan"
-                    active={columnFilterIsActive("area")}
-                    open={openColumnFilter === "area"}
-                    onToggle={() => toggleColumnFilter("area")}
-                    minWidth={120}
-                  >
-                    <TextFilterControl
-                      value={columnFilters.area}
-                      onChange={(value) =>
-                        updateColumnFilter("area", value)
-                      }
-                      onClear={() =>
-                        updateColumnFilter("area", "")
-                      }
-                      placeholder="Search area..."
+                    <SortHeader
+                      label="Luas Lahan"
+                      sortKey="area"
+                      kind="area"
+                      activeKey={sortKey}
+                      direction={sortDirection}
+                      onSort={handleSort}
+                      minWidth={120}
                     />
-                  </FilterHeader>
 
-                  <FilterHeader
-                    label="Media Posting"
-                    active={columnFilterIsActive("mediaPosting")}
-                    open={openColumnFilter === "mediaPosting"}
-                    onToggle={() => toggleColumnFilter("mediaPosting")}
-                    minWidth={128}
-                  >
-                    <NumberRangeFilterControl
-                      min={columnFilters.mediaPostingMin}
-                      max={columnFilters.mediaPostingMax}
-                      onMinChange={(value) =>
-                        updateColumnFilter("mediaPostingMin", value)
-                      }
-                      onMaxChange={(value) =>
-                        updateColumnFilter("mediaPostingMax", value)
-                      }
-                      onClear={() => {
-                        updateColumnFilter("mediaPostingMin", "");
-                        updateColumnFilter("mediaPostingMax", "");
-                      }}
+                    <SortHeader
+                      label="Media Posting"
+                      sortKey="mediaPosting"
+                      kind="number"
+                      activeKey={sortKey}
+                      direction={sortDirection}
+                      onSort={handleSort}
+                      minWidth={128}
                     />
-                  </FilterHeader>
 
-                  <FilterHeader
-                    label="Foot Traffic"
-                    active={columnFilterIsActive("footTraffic")}
-                    open={openColumnFilter === "footTraffic"}
-                    onToggle={() => toggleColumnFilter("footTraffic")}
-                    minWidth={126}
-                  >
-                    <NumberRangeFilterControl
-                      min={columnFilters.footTrafficMin}
-                      max={columnFilters.footTrafficMax}
-                      onMinChange={(value) =>
-                        updateColumnFilter("footTrafficMin", value)
-                      }
-                      onMaxChange={(value) =>
-                        updateColumnFilter("footTrafficMax", value)
-                      }
-                      onClear={() => {
-                        updateColumnFilter("footTrafficMin", "");
-                        updateColumnFilter("footTrafficMax", "");
-                      }}
+                    <SortHeader
+                      label="Foot Traffic"
+                      sortKey="footTraffic"
+                      kind="number"
+                      activeKey={sortKey}
+                      direction={sortDirection}
+                      onSort={handleSort}
+                      minWidth={126}
                     />
-                  </FilterHeader>
 
-                  <FilterHeader
-                    label="Test Ride"
-                    active={columnFilterIsActive("testRide")}
-                    open={openColumnFilter === "testRide"}
-                    onToggle={() => toggleColumnFilter("testRide")}
-                    minWidth={116}
-                  >
-                    <NumberRangeFilterControl
-                      min={columnFilters.testRideMin}
-                      max={columnFilters.testRideMax}
-                      onMinChange={(value) =>
-                        updateColumnFilter("testRideMin", value)
-                      }
-                      onMaxChange={(value) =>
-                        updateColumnFilter("testRideMax", value)
-                      }
-                      onClear={() => {
-                        updateColumnFilter("testRideMin", "");
-                        updateColumnFilter("testRideMax", "");
-                      }}
+                    <SortHeader
+                      label="Test Ride"
+                      sortKey="testRide"
+                      kind="number"
+                      activeKey={sortKey}
+                      direction={sortDirection}
+                      onSort={handleSort}
+                      minWidth={116}
                     />
-                  </FilterHeader>
 
-                  <FilterHeader
-                    label="SPK"
-                    active={columnFilterIsActive("spk")}
-                    open={openColumnFilter === "spk"}
-                    onToggle={() => toggleColumnFilter("spk")}
-                    minWidth={102}
-                  >
-                    <NumberRangeFilterControl
-                      min={columnFilters.spkMin}
-                      max={columnFilters.spkMax}
-                      onMinChange={(value) =>
-                        updateColumnFilter("spkMin", value)
-                      }
-                      onMaxChange={(value) =>
-                        updateColumnFilter("spkMax", value)
-                      }
-                      onClear={() => {
-                        updateColumnFilter("spkMin", "");
-                        updateColumnFilter("spkMax", "");
-                      }}
+                    <SortHeader
+                      label="SPK"
+                      sortKey="spk"
+                      kind="number"
+                      activeKey={sortKey}
+                      direction={sortDirection}
+                      onSort={handleSort}
+                      minWidth={102}
                     />
-                  </FilterHeader>
 
-                  <FilterHeader
-                    label="Budget"
-                    active={columnFilterIsActive("budget")}
-                    open={openColumnFilter === "budget"}
-                    onToggle={() => toggleColumnFilter("budget")}
-                    minWidth={140}
-                  >
-                    <NumberRangeFilterControl
-                      min={columnFilters.budgetMin}
-                      max={columnFilters.budgetMax}
-                      onMinChange={(value) =>
-                        updateColumnFilter("budgetMin", value)
-                      }
-                      onMaxChange={(value) =>
-                        updateColumnFilter("budgetMax", value)
-                      }
-                      onClear={() => {
-                        updateColumnFilter("budgetMin", "");
-                        updateColumnFilter("budgetMax", "");
-                      }}
+                    <SortHeader
+                      label="Budget"
+                      sortKey="budget"
+                      kind="number"
+                      activeKey={sortKey}
+                      direction={sortDirection}
+                      onSort={handleSort}
+                      minWidth={140}
                     />
-                  </FilterHeader>
 
-                  <FilterHeader
-                    label="SPP Link"
-                    active={columnFilterIsActive("spp")}
-                    open={openColumnFilter === "spp"}
-                    onToggle={() => toggleColumnFilter("spp")}
-                    minWidth={112}
-                  >
-                    <SelectFilterControl
-                      value={columnFilters.spp}
-                      onChange={(value) =>
-                        updateColumnFilter(
-                          "spp",
-                          value as LinkAvailability
-                        )
-                      }
-                      allLabel="All"
-                      options={[
-                        {
-                          value: "AVAILABLE",
-                          label: "Available"
-                        },
-                        {
-                          value: "MISSING",
-                          label: "Not Available"
-                        }
-                      ]}
-                    />
-                  </FilterHeader>
+                    <th style={{ minWidth: 104 }}>
+                      SPP LINK
+                    </th>
 
-                  <FilterHeader
-                    label="Quotation"
-                    active={columnFilterIsActive("quotation")}
-                    open={openColumnFilter === "quotation"}
-                    onToggle={() => toggleColumnFilter("quotation")}
-                    minWidth={118}
-                  >
-                    <SelectFilterControl
-                      value={columnFilters.quotation}
-                      onChange={(value) =>
-                        updateColumnFilter(
-                          "quotation",
-                          value as LinkAvailability
-                        )
-                      }
-                      allLabel="All"
-                      options={[
-                        {
-                          value: "AVAILABLE",
-                          label: "Available"
-                        },
-                        {
-                          value: "MISSING",
-                          label: "Not Available"
-                        }
-                      ]}
-                    />
-                  </FilterHeader>
-                  <FilterHeader
-                    label="Dokumentasi"
-                    active={columnFilterIsActive("documentation")}
-                    open={openColumnFilter === "documentation"}
-                    onToggle={() => toggleColumnFilter("documentation")}
-                    minWidth={124}
-                  >
-                    <SelectFilterControl
-                      value={columnFilters.documentation}
-                      onChange={(value) =>
-                        updateColumnFilter(
-                          "documentation",
-                          value as LinkAvailability
-                        )
-                      }
-                      allLabel="All"
-                      options={[
-                        {
-                          value: "AVAILABLE",
-                          label: "Available"
-                        },
-                        {
-                          value: "MISSING",
-                          label: "Not Available"
-                        }
-                      ]}
-                    />
-                  </FilterHeader>
-                </tr>
-              </thead>
+                    <th style={{ minWidth: 110 }}>
+                      QUOTATION
+                    </th>
+
+                    <th style={{ minWidth: 118 }}>
+                      DOKUMENTASI
+                    </th>
+                  </tr>
+                </thead>
 
 
 
                 <tbody>
 
-                  {filteredEvents.length === 0 ? (
+                  {sortedEvents.length === 0 ? (
 
                     <tr>
 
@@ -2361,7 +2480,7 @@ export default function AnnualBigEventDashboard({
 
                   ) : (
 
-                    filteredEvents.map((event) => {
+                    pagedEvents.map((event) => {
 
                       const expanded =
 
@@ -2974,6 +3093,155 @@ export default function AnnualBigEventDashboard({
 
               </table>
 
+            </div>
+
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 16,
+                flexWrap: "wrap",
+                marginTop: 16,
+                paddingTop: 14,
+                borderTop: "1px solid #edf0f5"
+              }}
+            >
+              <span
+                style={{
+                  color: "#8a93a9",
+                  fontSize: 9,
+                  fontWeight: 700
+                }}
+              >
+                {sortedEvents.length
+                  ? `Showing ${
+                      (currentPage - 1) * EVENTS_PER_PAGE + 1
+                    }–${Math.min(
+                      currentPage * EVENTS_PER_PAGE,
+                      sortedEvents.length
+                    )} of ${sortedEvents.length} events`
+                  : "Showing 0 events"}
+              </span>
+
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 8,
+                  flexWrap: "wrap"
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={() =>
+                    setCurrentPage((current) =>
+                      Math.max(1, current - 1)
+                    )
+                  }
+                  disabled={currentPage === 1}
+                  aria-label="Previous page"
+                  style={{
+                    width: 34,
+                    height: 34,
+                    borderRadius: "50%",
+                    border: "1px solid #d6deed",
+                    background:
+                      currentPage === 1
+                        ? "#f4f6fa"
+                        : "#ffffff",
+                    color:
+                      currentPage === 1
+                        ? "#b7bfd0"
+                        : "#1f2942",
+                    fontSize: 18,
+                    fontWeight: 900,
+                    cursor:
+                      currentPage === 1
+                        ? "not-allowed"
+                        : "pointer"
+                  }}
+                >
+                  ‹
+                </button>
+
+                {pageNumbers.map((page) => (
+                  <button
+                    type="button"
+                    key={page}
+                    onClick={() =>
+                      setCurrentPage(page)
+                    }
+                    aria-current={
+                      currentPage === page
+                        ? "page"
+                        : undefined
+                    }
+                    style={{
+                      minWidth: 34,
+                      height: 34,
+                      padding: "0 10px",
+                      borderRadius: 999,
+                      border:
+                        currentPage === page
+                          ? "1px solid #4963e6"
+                          : "1px solid #d6deed",
+                      background:
+                        currentPage === page
+                          ? "#4963e6"
+                          : "#ffffff",
+                      color:
+                        currentPage === page
+                          ? "#ffffff"
+                          : "#1f2942",
+                      fontSize: 11,
+                      fontWeight: 900,
+                      cursor: "pointer"
+                    }}
+                  >
+                    {page}
+                  </button>
+                ))}
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    setCurrentPage((current) =>
+                      Math.min(
+                        totalPages,
+                        current + 1
+                      )
+                    )
+                  }
+                  disabled={
+                    currentPage === totalPages
+                  }
+                  aria-label="Next page"
+                  style={{
+                    width: 34,
+                    height: 34,
+                    borderRadius: "50%",
+                    border: "1px solid #d6deed",
+                    background:
+                      currentPage === totalPages
+                        ? "#f4f6fa"
+                        : "#ffffff",
+                    color:
+                      currentPage === totalPages
+                        ? "#b7bfd0"
+                        : "#1f2942",
+                    fontSize: 18,
+                    fontWeight: 900,
+                    cursor:
+                      currentPage === totalPages
+                        ? "not-allowed"
+                        : "pointer"
+                  }}
+                >
+                  ›
+                </button>
+              </div>
             </div>
 
           </section>
