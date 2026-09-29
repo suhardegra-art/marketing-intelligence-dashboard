@@ -1,5 +1,5 @@
 import Sidebar from "@/components/Sidebar";
-import { getAnnualBigEventData } from "@/lib/annual-big-event";
+import { getAnnualBigEventData } from "@/lib/annual-big-event-source";
 import AnnualBigEventDashboard from "./components/AnnualBigEventDashboard";
 
 export const dynamic = "force-dynamic";

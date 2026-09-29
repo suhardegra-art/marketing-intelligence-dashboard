@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifySessionToken } from "@/lib/session";
-import { getAnnualBigEventData } from "@/lib/annual-big-event-source";
+import { getReportMediaData } from "@/lib/report-media";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const data = await getAnnualBigEventData();
+  const data = await getReportMediaData();
 
   return NextResponse.json(data, {
     status: data.connected ? 200 : 503,

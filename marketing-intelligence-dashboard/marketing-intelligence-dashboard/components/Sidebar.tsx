@@ -30,7 +30,7 @@ const groups = [
       "Offline Overview",
       "Annual Big Event",
       "Launching & Regional Event",
-      "Side Event",
+      "Reguler Event",
       "Report Media"
     ]
   }
@@ -45,7 +45,7 @@ function itemHref(item: string) {
   if (item === "Offline Overview") return "/offline-overview";
   if (item === "Annual Big Event") return "/annual-big-event";
   if (item === "Launching & Regional Event") return "/launching-regional-event";
-  if (item === "Side Event") return "/side-event";
+  if (item === "Reguler Event") return "/side-event";
   if (item === "Report Media") return "/report-media";
   return null;
 }

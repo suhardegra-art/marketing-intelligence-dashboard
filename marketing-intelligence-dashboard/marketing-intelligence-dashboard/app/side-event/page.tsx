@@ -9,15 +9,15 @@ export default async function SideEventPage() {
 
   return (
     <div className="app-shell">
-      <Sidebar activeItem="Side Event" />
+      <Sidebar activeItem="Reguler Event" />
 
       <main className="main-content">
         <AnnualBigEventDashboard
           initialData={data}
-          pageTitle="Side Event"
+          pageTitle="Reguler Event"
           dataApiPath="/api/side-event/data"
           aiApiPath="/api/side-event/ai"
-          csvFileName="side-event-data.csv"
+          csvFileName="reguler-event-data.csv"
         />
       </main>
     </div>

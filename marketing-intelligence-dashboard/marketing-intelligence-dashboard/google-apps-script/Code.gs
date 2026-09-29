@@ -2,8 +2,10 @@ const SPREADSHEET_ID =
   "1KEPkOSSS_5RV0RQw4RQpIdkz3fqxnB37MPhJnPCdcQg";
 
 const ALLOWED_SHEET_NAMES = [
+  "Anual Big Event",
   "Launching & Regional Event",
-  "Side Event"
+  "Reguler Event",
+  "Report Media"
 ];
 
 function doGet(e) {
@@ -18,10 +20,7 @@ function doGet(e) {
         ? String(e.parameter.key || "")
         : "";
 
-    if (
-      !expectedKey ||
-      providedKey !== expectedKey
-    ) {
+    if (!expectedKey || providedKey !== expectedKey) {
       return jsonResponse({
         ok: false,
         error: "Unauthorized"
@@ -33,42 +32,28 @@ function doGet(e) {
         ? String(e.parameter.sheet || "")
         : "";
 
-    if (
-      ALLOWED_SHEET_NAMES.indexOf(
-        requestedSheet
-      ) < 0
-    ) {
+    if (ALLOWED_SHEET_NAMES.indexOf(requestedSheet) < 0) {
       return jsonResponse({
         ok: false,
-        error:
-          'Invalid sheet. Allowed: "Launching & Regional Event" or "Side Event".'
+        error: "Invalid sheet. Allowed: " + ALLOWED_SHEET_NAMES.join(", ")
       });
     }
 
-    // Always open the exact Marketing Event Detail Report
-    // spreadsheet supplied for these pages.
     const spreadsheet =
-      SpreadsheetApp.openById(
-        SPREADSHEET_ID
-      );
+      SpreadsheetApp.openById(SPREADSHEET_ID);
 
     const sheet =
-      spreadsheet.getSheetByName(
-        requestedSheet
-      );
+      spreadsheet.getSheetByName(requestedSheet);
 
     if (!sheet) {
       return jsonResponse({
         ok: false,
-        error:
-          `Sheet "${requestedSheet}" was not found in "${spreadsheet.getName()}".`
+        error: `Sheet "${requestedSheet}" was not found in "${spreadsheet.getName()}".`
       });
     }
 
     const values =
-      sheet
-        .getDataRange()
-        .getDisplayValues();
+      sheet.getDataRange().getDisplayValues();
 
     const dataString =
       JSON.stringify(values);
@@ -84,26 +69,19 @@ function doGet(e) {
       .map(function(byte) {
         return (
           "0" +
-          ((byte + 256) % 256)
-            .toString(16)
+          ((byte + 256) % 256).toString(16)
         ).slice(-2);
       })
       .join("");
 
     return jsonResponse({
       ok: true,
-      spreadsheetName:
-        spreadsheet.getName(),
-      spreadsheetId:
-        spreadsheet.getId(),
-      sheetName:
-        requestedSheet,
-      fetchedAt:
-        new Date().toISOString(),
-      dataVersion:
-        dataVersion,
-      values:
-        values
+      spreadsheetName: spreadsheet.getName(),
+      spreadsheetId: spreadsheet.getId(),
+      sheetName: requestedSheet,
+      fetchedAt: new Date().toISOString(),
+      dataVersion: dataVersion,
+      values: values
     });
   } catch (error) {
     return jsonResponse({
@@ -118,10 +96,6 @@ function doGet(e) {
 
 function jsonResponse(payload) {
   return ContentService
-    .createTextOutput(
-      JSON.stringify(payload)
-    )
-    .setMimeType(
-      ContentService.MimeType.JSON
-    );
+    .createTextOutput(JSON.stringify(payload))
+    .setMimeType(ContentService.MimeType.JSON);
 }
