@@ -110,8 +110,7 @@ type ColumnFilterKey =
   | "spk"
   | "budget"
   | "spp"
-  | "quotation"
-  | "documentation";
+  | "quotation";
 
 type ColumnFilters = {
   startDateFrom: string;
@@ -134,7 +133,6 @@ type ColumnFilters = {
   budgetMax: string;
   spp: LinkAvailability;
   quotation: LinkAvailability;
-  documentation: LinkAvailability;
 };
 
 const EMPTY_COLUMN_FILTERS: ColumnFilters = {
@@ -157,8 +155,7 @@ const EMPTY_COLUMN_FILTERS: ColumnFilters = {
   budgetMin: "",
   budgetMax: "",
   spp: "ALL",
-  quotation: "ALL",
-  documentation: "ALL"
+  quotation: "ALL"
 };
 
 const filterInputStyle: CSSProperties = {
@@ -598,9 +595,7 @@ function exportCsv(events: AnnualBigEvent[], fileName = "annual-big-event-data.c
 
     "SPP Link",
 
-    "Quotation",
-
-    "Dokumentasi"
+    "Quotation"
 
   ];
 
@@ -636,9 +631,7 @@ function exportCsv(events: AnnualBigEvent[], fileName = "annual-big-event-data.c
 
     event.sppLink || "",
 
-    event.quotationLink || "",
-
-    event.documentationLink || ""
+    event.quotationLink || ""
 
   ]);
 
@@ -1148,10 +1141,6 @@ export default function AnnualBigEventDashboard({
         matchesAvailability(
           event.quotationLink,
           columnFilters.quotation
-        ) &&
-        matchesAvailability(
-          event.documentationLink,
-          columnFilters.documentation
         );
 
       return (
@@ -1224,8 +1213,6 @@ export default function AnnualBigEventDashboard({
         return columnFilters.spp !== "ALL";
       case "quotation":
         return columnFilters.quotation !== "ALL";
-      case "documentation":
-        return columnFilters.documentation !== "ALL";
       default:
         return false;
     }
@@ -2312,34 +2299,6 @@ export default function AnnualBigEventDashboard({
                       ]}
                     />
                   </FilterHeader>
-                  <FilterHeader
-                    label="Dokumentasi"
-                    active={columnFilterIsActive("documentation")}
-                    open={openColumnFilter === "documentation"}
-                    onToggle={() => toggleColumnFilter("documentation")}
-                    minWidth={124}
-                  >
-                    <SelectFilterControl
-                      value={columnFilters.documentation}
-                      onChange={(value) =>
-                        updateColumnFilter(
-                          "documentation",
-                          value as LinkAvailability
-                        )
-                      }
-                      allLabel="All"
-                      options={[
-                        {
-                          value: "AVAILABLE",
-                          label: "Available"
-                        },
-                        {
-                          value: "MISSING",
-                          label: "Not Available"
-                        }
-                      ]}
-                    />
-                  </FilterHeader>
                 </tr>
               </thead>
 
@@ -2351,7 +2310,7 @@ export default function AnnualBigEventDashboard({
 
                     <tr>
 
-                      <td colSpan={16}>
+                      <td colSpan={15}>
 
                         No event data found.
 
@@ -2602,33 +2561,6 @@ export default function AnnualBigEventDashboard({
                               )}
 
                             </td>
-                            <td>
-
-                              {event.documentationLink ? (
-
-                                <a
-
-                                  className={styles.tableLink}
-
-                                  href={event.documentationLink}
-
-                                  target="_blank"
-
-                                  rel="noreferrer"
-
-                                >
-
-                                  Open ↗
-
-                                </a>
-
-                              ) : (
-
-                                "—"
-
-                              )}
-
-                            </td>
 
                           </tr>
 
@@ -2638,7 +2570,7 @@ export default function AnnualBigEventDashboard({
 
                             <tr className={styles.detailTableRow}>
 
-                              <td colSpan={16}>
+                              <td colSpan={15}>
 
                                 <div className={styles.inlineDetail}>
 

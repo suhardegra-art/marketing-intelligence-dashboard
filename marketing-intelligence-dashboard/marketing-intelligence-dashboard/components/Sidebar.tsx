@@ -28,35 +28,25 @@ const groups = [
     label: "OFFLINE",
     items: [
       "Offline Overview",
-      "Launching Activity",
       "Annual Big Event",
+      "Launching & Regional Event",
       "Side Event",
-      "Regional Event"
-    ]
-  },
-  {
-    label: "AI INTELLIGENCE",
-    items: [
-      "AI Summary",
-      "Recommendations",
-      "Performance Alert"
-    ]
-  },
-  {
-    label: "DATA",
-    items: [
-      "Upload Data",
-      "Data Sources",
-      "Master Data"
+      "Report Media"
     ]
   }
 ];
 
 function itemHref(item: string) {
+  if (item === "Instagram") return "/instagram";
   if (item === "TikTok") return "/tiktok";
   if (item === "TikTok Live") return "/tiktok-live";
   if (item === "YouTube") return "/youtube";
   if (item === "Auto Reply Comment") return "/auto-reply-comment";
+  if (item === "Offline Overview") return "/offline-overview";
+  if (item === "Annual Big Event") return "/annual-big-event";
+  if (item === "Launching & Regional Event") return "/launching-regional-event";
+  if (item === "Side Event") return "/side-event";
+  if (item === "Report Media") return "/report-media";
   return null;
 }
 
