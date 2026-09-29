@@ -1,7 +1,7 @@
 import { getEventSheetData } from "@/lib/event-sheet-data";
 
 export const ANNUAL_BIG_EVENT_SHEET_NAME =
-  "Anual Big Event";
+  "Annual Big Event";
 
 export function getAnnualBigEventData() {
   return getEventSheetData(

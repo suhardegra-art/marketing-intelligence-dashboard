@@ -75,7 +75,7 @@ type SheetPayload = {
   error?: string;
 };
 
-const DEFAULT_SHEET_NAME = "Anual Big Event";
+const DEFAULT_SHEET_NAME = "Annual Big Event";
 
 function normalizeHeader(value: unknown) {
   return String(value ?? "")
