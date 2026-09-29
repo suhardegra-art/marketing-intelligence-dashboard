@@ -255,25 +255,25 @@ function compareDate(
     : -result;
 }
 
-function sortIndicator(
-  kind: SortKind,
-  direction: SortDirection
-) {
+function sortOptionLabels(kind: SortKind) {
   if (kind === "text") {
-    return direction === "asc"
-      ? "A-Z"
-      : "Z-A";
+    return {
+      asc: "A → Z",
+      desc: "Z → A"
+    };
   }
 
   if (kind === "date") {
-    return direction === "asc"
-      ? "Old-New"
-      : "New-Old";
+    return {
+      asc: "Oldest → Newest",
+      desc: "Newest → Oldest"
+    };
   }
 
-  return direction === "asc"
-    ? "Low-High"
-    : "High-Low";
+  return {
+    asc: "Lowest → Highest",
+    desc: "Highest → Lowest"
+  };
 }
 
 function SortHeader({
@@ -291,66 +291,63 @@ function SortHeader({
   direction: SortDirection;
   onSort: (
     key: MediaSortKey,
-    kind: SortKind
+    direction: SortDirection
   ) => void;
 }) {
-  const active =
-    activeKey === sortKey;
+  const active = activeKey === sortKey;
+  const labels = sortOptionLabels(kind);
 
   return (
-    <th>
-      <button
-        type="button"
-        onClick={() =>
-          onSort(sortKey, kind)
-        }
-        title={`Sort ${label}`}
+    <th
+      style={{
+        whiteSpace: "nowrap"
+      }}
+    >
+      <span>{label}</span>
+
+      <select
+        value={active ? direction : ""}
+        onChange={(event) => {
+          const value = event.target.value;
+
+          if (
+            value === "asc" ||
+            value === "desc"
+          ) {
+            onSort(
+              sortKey,
+              value as SortDirection
+            );
+          }
+        }}
         aria-label={`Sort ${label}`}
+        title="Sort column"
         style={{
-          width: "100%",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: 7,
-          padding: 0,
-          border: 0,
-          background: "transparent",
-          color: "inherit",
-          font: "inherit",
-          fontWeight:
-            active ? 900 : 800,
+          marginLeft: 6,
+          height: 24,
+          maxWidth: 30,
+          border: "1px solid #dce1ef",
+          borderRadius: 6,
+          background: "#fff",
+          color: "#59617a",
+          fontSize: 10,
           cursor: "pointer",
-          textTransform: "inherit",
-          letterSpacing: "inherit"
+          verticalAlign: "middle",
+          padding: "0 2px"
         }}
       >
-        <span>{label}</span>
-
-        <span
-          style={{
-            color:
-              active
-                ? "#3159d7"
-                : "#9aa4bb",
-            fontSize:
-              active ? 8 : 11,
-            fontWeight: 900,
-            textTransform: "none",
-            letterSpacing: 0,
-            whiteSpace: "nowrap"
-          }}
-        >
-          {active
-            ? sortIndicator(
-                kind,
-                direction
-              )
-            : "↕"}
-        </span>
-      </button>
+        <option value="">Sort</option>
+        <option value="asc">
+          {labels.asc}
+        </option>
+        <option value="desc">
+          {labels.desc}
+        </option>
+      </select>
     </th>
   );
 }
+
 
 export default function ReportMediaDashboard({
   initialData
@@ -375,7 +372,7 @@ export default function ReportMediaDashboard({
     sortDirection,
     setSortDirection
   ] =
-    useState<SortDirection>("asc");
+    useState<SortDirection>("desc");
 
   const [
     currentPage,
@@ -516,24 +513,11 @@ export default function ReportMediaDashboard({
 
   function handleSort(
     key: MediaSortKey,
-    kind: SortKind
+    direction: SortDirection
   ) {
     setCurrentPage(1);
-
-    if (sortKey === key) {
-      setSortDirection(
-        (current) =>
-          current === "asc"
-            ? "desc"
-            : "asc"
-      );
-      return;
-    }
-
     setSortKey(key);
-    setSortDirection(
-      defaultDirection(kind)
-    );
+    setSortDirection(direction);
   }
 
   const sortedEvents =
@@ -788,7 +772,7 @@ export default function ReportMediaDashboard({
     setYear("ALL");
     setStatus("ALL");
     setSortKey("date");
-    setSortDirection("asc");
+    setSortDirection("desc");
     setCurrentPage(1);
   }
 

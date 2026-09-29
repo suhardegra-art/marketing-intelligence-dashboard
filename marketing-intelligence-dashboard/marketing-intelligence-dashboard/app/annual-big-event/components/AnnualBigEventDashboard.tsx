@@ -188,19 +188,25 @@ function compareArea(
   return compareText(a, b, direction);
 }
 
-function sortIndicator(
-  kind: SortKind,
-  direction: SortDirection
-) {
+function sortOptionLabels(kind: SortKind) {
   if (kind === "text") {
-    return direction === "asc" ? "A-Z" : "Z-A";
+    return {
+      asc: "A → Z",
+      desc: "Z → A"
+    };
   }
 
   if (kind === "date") {
-    return direction === "asc" ? "Old-New" : "New-Old";
+    return {
+      asc: "Oldest → Newest",
+      desc: "Newest → Oldest"
+    };
   }
 
-  return direction === "asc" ? "Low-High" : "High-Low";
+  return {
+    asc: "Lowest → Highest",
+    desc: "Highest → Lowest"
+  };
 }
 
 function SortHeader({
@@ -217,10 +223,14 @@ function SortHeader({
   kind: SortKind;
   activeKey: EventSortKey;
   direction: SortDirection;
-  onSort: (key: EventSortKey, kind: SortKind) => void;
+  onSort: (
+    key: EventSortKey,
+    direction: SortDirection
+  ) => void;
   minWidth?: number;
 }) {
   const active = activeKey === sortKey;
+  const labels = sortOptionLabels(kind);
 
   return (
     <th
@@ -230,42 +240,47 @@ function SortHeader({
         whiteSpace: "nowrap"
       }}
     >
-      <button
-        type="button"
-        onClick={() => onSort(sortKey, kind)}
-        title={`Sort ${label}`}
+      <span>{label}</span>
+
+      <select
+        value={active ? direction : ""}
+        onChange={(event) => {
+          const value = event.target.value;
+
+          if (
+            value === "asc" ||
+            value === "desc"
+          ) {
+            onSort(
+              sortKey,
+              value as SortDirection
+            );
+          }
+        }}
         aria-label={`Sort ${label}`}
+        title="Sort column"
         style={{
-          width: "100%",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: 7,
-          padding: 0,
-          border: 0,
-          background: "transparent",
-          color: "inherit",
-          font: "inherit",
-          fontWeight: active ? 900 : 800,
+          marginLeft: 6,
+          height: 24,
+          maxWidth: 30,
+          border: "1px solid #dce1ef",
+          borderRadius: 6,
+          background: "#fff",
+          color: "#59617a",
+          fontSize: 10,
           cursor: "pointer",
-          textTransform: "inherit",
-          letterSpacing: "inherit"
+          verticalAlign: "middle",
+          padding: "0 2px"
         }}
       >
-        <span>{label}</span>
-        <span
-          style={{
-            flex: "0 0 auto",
-            color: active ? "#3159d7" : "#9aa4bb",
-            fontSize: active ? 8 : 11,
-            fontWeight: 900,
-            textTransform: "none",
-            letterSpacing: 0
-          }}
-        >
-          {active ? sortIndicator(kind, direction) : "↕"}
-        </span>
-      </button>
+        <option value="">Sort</option>
+        <option value="asc">
+          {labels.asc}
+        </option>
+        <option value="desc">
+          {labels.desc}
+        </option>
+      </select>
     </th>
   );
 }
@@ -1041,7 +1056,7 @@ export default function AnnualBigEventDashboard({
     useState<EventSortKey>("startDate");
 
   const [sortDirection, setSortDirection] =
-    useState<SortDirection>("asc");
+    useState<SortDirection>("desc");
 
   const [currentPage, setCurrentPage] =
     useState(1);
@@ -1310,19 +1325,11 @@ export default function AnnualBigEventDashboard({
 
   function handleSort(
     key: EventSortKey,
-    kind: SortKind
+    direction: SortDirection
   ) {
     setCurrentPage(1);
-
-    if (sortKey === key) {
-      setSortDirection((current) =>
-        current === "asc" ? "desc" : "asc"
-      );
-      return;
-    }
-
     setSortKey(key);
-    setSortDirection(defaultDirection(kind));
+    setSortDirection(direction);
   }
 
   const sortedEvents = useMemo(() => {
@@ -2294,7 +2301,7 @@ export default function AnnualBigEventDashboard({
                   setCity("ALL");
                   setStatus("ALL");
                   setSortKey("startDate");
-                  setSortDirection("asc");
+                  setSortDirection("desc");
                   setCurrentPage(1);
                   setColumnFilters({
                     ...EMPTY_COLUMN_FILTERS
