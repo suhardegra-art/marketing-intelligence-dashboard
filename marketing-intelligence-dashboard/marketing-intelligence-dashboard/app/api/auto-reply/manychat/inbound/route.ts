@@ -7,7 +7,8 @@ import {
 } from "@/lib/auto-reply-comments";
 
 import {
-  generateCustomerServiceDraft
+  generateCustomerServiceDraft,
+  type AutoReplyConversationTurn
 } from "@/lib/auto-reply-ai";
 
 export const runtime = "nodejs";
@@ -54,7 +55,6 @@ function secureEqual(left: string, right: string) {
   const b = Buffer.from(right);
 
   if (a.length !== b.length) return false;
-
   return timingSafeEqual(a, b);
 }
 
@@ -78,10 +78,11 @@ function fallbackEventId(input: {
   contactId: string;
   contentId: string;
   text: string;
+  createdAt?: string;
 }) {
   return createHash("sha256")
     .update(
-      `${input.contactId}|${input.contentId}|${input.text}`
+      `${input.contactId}|${input.contentId}|${input.text}|${input.createdAt || ""}`
     )
     .digest("hex")
     .slice(0, 24);
@@ -115,83 +116,76 @@ function buildManyChatLinkNote(
     .join(" • ");
 }
 
-async function linkRecentMatchingPendingItem(input: {
-  platform: string;
-  commentText: string;
-  displayName: string | null;
-  username: string | null;
-  contactId: string;
-  inboxUrl: string | null;
-}) {
-  if (
-    !input.contactId ||
-    (!input.displayName && !input.username)
-  ) {
-    return null;
-  }
+async function loadConversationHistory(
+  platform: string,
+  contactId: string
+): Promise<AutoReplyConversationTurn[]> {
+  if (!contactId) return [];
 
-  const rows =
+  const prefix = `manychat-${contactId}-`;
+
+  const comments =
     (await autoReplySupabaseRequest(
       `/rest/v1/social_comments?platform=eq.${encodeURIComponent(
-        input.platform
-      )}&status=in.(PENDING_APPROVAL,AI_DRAFTED)&comment_text=eq.${encodeURIComponent(
-        input.commentText
-      )}&select=id,status,user_display_name,username,created_at&order=created_at.desc&limit=20`
+        platform
+      )}&platform_comment_id=like.${encodeURIComponent(
+        `${prefix}%`
+      )}&select=id,comment_text,created_at&order=created_at.desc&limit=8`
     )) as Array<{
       id: string;
-      status: string;
-      user_display_name: string | null;
-      username: string | null;
+      comment_text: string;
       created_at: string;
     }>;
 
-  const normalizedName =
-    input.displayName?.trim().toLowerCase() || null;
+  if (!comments.length) return [];
 
-  const normalizedUsername =
-    input.username?.trim().toLowerCase() || null;
+  const ids = comments
+    .map((row) => `"${row.id}"`)
+    .join(",");
 
-  const match = rows.find((row) => {
-    const rowName =
-      row.user_display_name?.trim().toLowerCase() || null;
+  const replies =
+    (await autoReplySupabaseRequest(
+      `/rest/v1/social_comment_replies?comment_id=in.(${encodeURIComponent(
+        ids
+      )})&select=comment_id,final_reply,ai_draft,sent_at,approved_at&limit=50`
+    )) as Array<{
+      comment_id: string;
+      final_reply: string | null;
+      ai_draft: string | null;
+      sent_at: string | null;
+      approved_at: string | null;
+    }>;
 
-    const rowUsername =
-      row.username?.trim().toLowerCase() || null;
-
-    if (
-      normalizedUsername &&
-      rowUsername &&
-      normalizedUsername === rowUsername
-    ) {
-      return true;
-    }
-
-    if (
-      normalizedName &&
-      rowName &&
-      normalizedName === rowName
-    ) {
-      return true;
-    }
-
-    return false;
-  });
-
-  if (!match) {
-    return null;
-  }
-
-  await writeAutoReplyActivity(
-    match.id,
-    "MANYCHAT_CONTACT_LINKED",
-    "ManyChat Collector",
-    buildManyChatLinkNote(
-      input.contactId,
-      input.inboxUrl
-    )
+  const replyByComment = new Map(
+    replies.map((row) => [row.comment_id, row])
   );
 
-  return match;
+  const chronological = [...comments].reverse();
+  const turns: AutoReplyConversationTurn[] = [];
+
+  for (const row of chronological) {
+    if (row.comment_text?.trim()) {
+      turns.push({
+        role: "customer",
+        text: row.comment_text.trim()
+      });
+    }
+
+    const reply = replyByComment.get(row.id);
+    const sentText =
+      reply?.sent_at && reply.final_reply
+        ? reply.final_reply.trim()
+        : "";
+
+    if (sentText) {
+      turns.push({
+        role: "admin",
+        text: sentText
+      });
+    }
+  }
+
+  return turns.slice(-10);
 }
 
 export async function POST(request: NextRequest) {
@@ -205,10 +199,6 @@ export async function POST(request: NextRequest) {
 
     const body = (await request.json()) as Payload;
 
-    /*
-      ManyChat "Add Full Contact Data" sends the contact JSON directly
-      as the TOP-LEVEL request body. Support both that shape and wrapped shapes.
-    */
     const directContactBody =
       body.id ||
       body.key ||
@@ -256,18 +246,19 @@ export async function POST(request: NextRequest) {
           customFields.username
       ) || null;
 
-    const commentText = str(
+    const messageText = str(
       body.comment_text ??
+        body.message ??
         body.text ??
         body.last_input_text ??
         fullContact.last_input_text
     );
 
-    if (!commentText) {
+    if (!messageText) {
       return NextResponse.json(
         {
           error:
-            "No comment/message text received. Map the trigger text to comment_text or send Full Contact Data."
+            "No DM/message text received. Map Instagram Last Text Input to message or send Full Contact Data."
         },
         { status: 400 }
       );
@@ -296,42 +287,18 @@ export async function POST(request: NextRequest) {
           body.post_id
       );
 
-    /*
-      Repair older Phase-1 records:
-      match same pending text + same contact name/username, then link contact ID.
-    */
-    const relinked =
-      await linkRecentMatchingPendingItem({
-        platform,
-        commentText,
-        displayName,
-        username,
-        contactId,
-        inboxUrl
-      });
-
-    if (relinked) {
-      return NextResponse.json({
-        ok: true,
-        relinked: true,
-        duplicate: true,
-        commentId: relinked.id,
-        status: relinked.status,
-        contactLinked: Boolean(contactId),
-        manyChatContactId: contactId || null
-      });
-    }
-
     const platformCommentId =
       str(
         body.platform_comment_id ??
           body.comment_id ??
-          body.event_id
+          body.event_id ??
+          body.message_id
       ) ||
       `manychat-${contactId || "unknown"}-${fallbackEventId({
         contactId: contactId || "unknown",
         contentId: platformContentId || "direct-message",
-        text: commentText
+        text: messageText,
+        createdAt
       })}`;
 
     const existing = await findExisting(
@@ -345,10 +312,7 @@ export async function POST(request: NextRequest) {
           existing.id,
           "MANYCHAT_CONTACT_LINKED",
           "ManyChat Collector",
-          buildManyChatLinkNote(
-            contactId,
-            inboxUrl
-          )
+          buildManyChatLinkNote(contactId, inboxUrl)
         );
       }
 
@@ -362,11 +326,18 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    const conversationHistory =
+      await loadConversationHistory(
+        platform,
+        contactId
+      );
+
     const draft = await generateCustomerServiceDraft({
       platform,
       customerName: displayName,
       username,
-      commentText
+      commentText: messageText,
+      conversationHistory
     });
 
     if (!draft.draftReply) {
@@ -390,7 +361,7 @@ export async function POST(request: NextRequest) {
               platformContentId || null,
             username,
             user_display_name: displayName,
-            comment_text: commentText,
+            comment_text: messageText,
             comment_url:
               str(body.comment_url) || null,
             comment_created_at: createdAt,
@@ -399,7 +370,9 @@ export async function POST(request: NextRequest) {
             priority:
               draft.priority === "HIGH"
                 ? "urgent"
-                : "normal",
+                : draft.priority === "LOW"
+                  ? "low"
+                  : "normal",
             ai_confidence: draft.confidence,
             status: "PENDING_APPROVAL",
             updated_at: new Date().toISOString()
@@ -411,7 +384,7 @@ export async function POST(request: NextRequest) {
 
     if (!commentId) {
       throw new Error(
-        "Supabase did not return a comment ID."
+        "Supabase did not return a message ID."
       );
     }
 
@@ -442,7 +415,13 @@ export async function POST(request: NextRequest) {
         draft.needsConfirmation
           ? "Needs information confirmation."
           : "Draft generated for human approval.",
+        draft.priority === "HIGH"
+          ? "High-priority review."
+          : null,
         draft.note || null,
+        conversationHistory.length
+          ? `Conversation context: ${conversationHistory.length} prior turns.`
+          : "No prior conversation context.",
         contactId
           ? `ManyChat contact: ${contactId}`
           : null,
@@ -459,6 +438,8 @@ export async function POST(request: NextRequest) {
       approvalRequired: true,
       draftGenerated: true,
       needsConfirmation: draft.needsConfirmation,
+      priority: draft.priority,
+      conversationTurns: conversationHistory.length,
       contactLinked: Boolean(contactId),
       manyChatContactId: contactId || null
     });

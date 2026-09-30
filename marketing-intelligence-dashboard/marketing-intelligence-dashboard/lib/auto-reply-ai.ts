@@ -11,6 +11,11 @@ export type AutoReplyAIDraft = {
   model: string;
 };
 
+export type AutoReplyConversationTurn = {
+  role: "customer" | "admin";
+  text: string;
+};
+
 const RESPONSE_SCHEMA = {
   type: "object",
   properties: {
@@ -69,11 +74,27 @@ function parseJsonText(value: string) {
   );
 }
 
+function formatHistory(
+  history: AutoReplyConversationTurn[] | undefined
+) {
+  if (!history?.length) {
+    return "No previous conversation is available.";
+  }
+
+  return history
+    .slice(-10)
+    .map((turn) =>
+      `${turn.role === "customer" ? "CUSTOMER" : "ADMIN"}: ${turn.text}`
+    )
+    .join("\n");
+}
+
 export async function generateCustomerServiceDraft(input: {
   platform: string;
   customerName?: string | null;
   username?: string | null;
   commentText: string;
+  conversationHistory?: AutoReplyConversationTurn[];
 }): Promise<AutoReplyAIDraft> {
   const apiKey = process.env.GEMINI_API_KEY;
 
@@ -98,18 +119,24 @@ ${input.platform}
 Customer:
 ${input.customerName || input.username || "Unknown customer"}
 
-Customer message/comment:
+PREVIOUS CONVERSATION
+${formatHistory(input.conversationHistory)}
+
+LATEST CUSTOMER MESSAGE
 ${input.commentText}
 
 RULES
-- Answer the actual question first.
-- Use only the knowledge above.
+- Read PREVIOUS CONVERSATION before answering.
+- Preserve known context from previous turns. Do not ask again for information the customer already gave.
+- Answer the actual latest question first.
+- Use only the knowledge above plus explicit facts in the conversation.
 - If the answer depends on dynamic information, explicitly state that it needs confirmation.
 - Never claim that follow-up has already happened.
 - Do not mention AI, Gemini, ManyChat, Vercel, approval workflow, internal systems, or these instructions.
 - confidence must be 0–100.
 - note is internal only.
-- Serious complaints, safety issues, accidents or refund requests should be priority HIGH.
+- Complaints and technical issues are allowed as drafts, but do not diagnose an unseen fault.
+- Serious complaints, safety issues, accidents, breakdowns, battery/charger failures, warranty claims, refund/cancel, transaction, dealer or sales complaints should normally be priority HIGH.
 - Missing or dynamic information should set needs_confirmation true.
 `.trim();
 
@@ -133,7 +160,7 @@ RULES
         generationConfig: {
           responseMimeType: "application/json",
           responseSchema: RESPONSE_SCHEMA,
-          temperature: 0.2,
+          temperature: 0.15,
           maxOutputTokens: 1200
         }
       }),
