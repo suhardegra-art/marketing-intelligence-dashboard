@@ -1,3 +1,99 @@
+import { AUTO_REPLY_KNOWLEDGE } from "@/lib/auto-reply-knowledge";
+
+export type AutoReplyAIDraft = {
+  draftReply: string;
+  intent: string;
+  sentiment: string;
+  priority: "LOW" | "NORMAL" | "HIGH";
+  confidence: number;
+  needsConfirmation: boolean;
+  note: string;
+  model: string;
+};
+
+export type AutoReplyConversationTurn = {
+  role: "customer" | "admin";
+  text: string;
+};
+
+const RESPONSE_SCHEMA = {
+  type: "object",
+  properties: {
+    draft_reply: { type: "string" },
+    intent: { type: "string" },
+    sentiment: {
+      type: "string",
+      enum: ["POSITIVE", "NEUTRAL", "NEGATIVE"]
+    },
+    priority: {
+      type: "string",
+      enum: ["LOW", "NORMAL", "HIGH"]
+    },
+    confidence: { type: "number" },
+    needs_confirmation: { type: "boolean" },
+    note: { type: "string" }
+  },
+  required: [
+    "draft_reply",
+    "intent",
+    "sentiment",
+    "priority",
+    "confidence",
+    "needs_confirmation",
+    "note"
+  ]
+};
+
+function getOutputText(payload: any) {
+  const parts = payload?.candidates?.[0]?.content?.parts;
+
+  if (!Array.isArray(parts)) {
+    return "";
+  }
+
+  return parts
+    .filter((part: any) => !part?.thought)
+    .map((part: any) =>
+      typeof part?.text === "string" ? part.text : ""
+    )
+    .join("")
+    .trim();
+}
+
+function parseJsonText(value: string) {
+  const cleaned = value
+    .replace(/^```json\s*/i, "")
+    .replace(/^```\s*/i, "")
+    .replace(/\s*```$/i, "")
+    .trim();
+
+  const first = cleaned.indexOf("{");
+  const last = cleaned.lastIndexOf("}");
+
+  return JSON.parse(
+    first >= 0 && last > first
+      ? cleaned.slice(first, last + 1)
+      : cleaned
+  );
+}
+
+function formatHistory(
+  history: AutoReplyConversationTurn[] | undefined
+) {
+  if (!history?.length) {
+    return "No previous conversation is available.";
+  }
+
+  return history
+    .slice(-10)
+    .map((turn) =>
+      `${turn.role === "customer" ? "CUSTOMER" : "ADMIN"}: ${turn.text}`
+    )
+    .join("\n");
+}
+
+export async function generateCustomerServiceDraft(input: {
+  platform: string;
   customerName?: string | null;
   username?: string | null;
   commentText: string;
