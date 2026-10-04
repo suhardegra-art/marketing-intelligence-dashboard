@@ -1,5 +1,5 @@
 import { createHash, timingSafeEqual } from "crypto";
-import { NextRequest, NextResponse } from "next/server";
+import { after, NextRequest, NextResponse } from "next/server";
 
 import {
   autoReplySupabaseRequest,
@@ -188,17 +188,15 @@ async function loadConversationHistory(
   return turns.slice(-10);
 }
 
-export async function POST(request: NextRequest) {
+/**
+ * All AI/database work happens here.
+ *
+ * The public POST handler below acknowledges ManyChat immediately.
+ * Next.js `after()` keeps this work alive after the HTTP response,
+ * so Gemini latency no longer consumes ManyChat's 10-second response window.
+ */
+async function processInbound(body: Payload) {
   try {
-    if (!authorized(request)) {
-      return NextResponse.json(
-        { error: "Invalid ManyChat secret." },
-        { status: 401 }
-      );
-    }
-
-    const body = (await request.json()) as Payload;
-
     const directContactBody =
       body.id ||
       body.key ||
@@ -255,13 +253,10 @@ export async function POST(request: NextRequest) {
     );
 
     if (!messageText) {
-      return NextResponse.json(
-        {
-          error:
-            "No DM/message text received. Map Instagram Last Text Input to message or send Full Contact Data."
-        },
-        { status: 400 }
+      console.error(
+        "ManyChat background processing: no message text received."
       );
+      return;
     }
 
     const createdAt =
@@ -316,14 +311,7 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      return NextResponse.json({
-        ok: true,
-        duplicate: true,
-        commentId: existing.id,
-        status: existing.status,
-        contactLinked: Boolean(contactId),
-        manyChatContactId: contactId || null
-      });
+      return;
     }
 
     const conversationHistory =
@@ -431,21 +419,59 @@ export async function POST(request: NextRequest) {
         .join(" • ")
     );
 
-    return NextResponse.json({
-      ok: true,
-      commentId,
-      status: "PENDING_APPROVAL",
-      approvalRequired: true,
-      draftGenerated: true,
-      needsConfirmation: draft.needsConfirmation,
-      priority: draft.priority,
-      conversationTurns: conversationHistory.length,
-      contactLinked: Boolean(contactId),
-      manyChatContactId: contactId || null
-    });
+    console.log(
+      "ManyChat background processing complete",
+      {
+        commentId,
+        platform,
+        accountKey:
+          str(body.account_key) || "indomobil-emotor",
+        conversationTurns:
+          conversationHistory.length
+      }
+    );
   } catch (error) {
     console.error(
-      "ManyChat inbound AI draft error",
+      "ManyChat background AI draft error",
+      error
+    );
+  }
+}
+
+/**
+ * Fast acknowledgement endpoint for ManyChat.
+ *
+ * IMPORTANT:
+ * ManyChat has a 10-second External Request timeout.
+ * We authenticate and parse the request, schedule the actual
+ * AI/database work with Next.js `after()`, then return 200 immediately.
+ */
+export async function POST(request: NextRequest) {
+  try {
+    if (!authorized(request)) {
+      return NextResponse.json(
+        { error: "Invalid ManyChat secret." },
+        { status: 401 }
+      );
+    }
+
+    const body = (await request.json()) as Payload;
+
+    after(async () => {
+      await processInbound(body);
+    });
+
+    return NextResponse.json(
+      {
+        ok: true,
+        received: true,
+        processing: "BACKGROUND"
+      },
+      { status: 200 }
+    );
+  } catch (error) {
+    console.error(
+      "ManyChat inbound acknowledgement error",
       error
     );
 
@@ -454,7 +480,7 @@ export async function POST(request: NextRequest) {
         error:
           error instanceof Error
             ? error.message
-            : "Unable to create AI draft."
+            : "Unable to acknowledge ManyChat request."
       },
       { status: 500 }
     );
