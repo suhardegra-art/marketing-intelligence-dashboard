@@ -16,6 +16,20 @@ export const dynamic = "force-dynamic";
 
 type Payload = Record<string, any>;
 
+type NormalizedInbound = {
+  platform: string;
+  accountKey: string;
+  contactId: string;
+  displayName: string | null;
+  username: string | null;
+  messageText: string;
+  createdAt: string;
+  inboxUrl: string | null;
+  platformContentId: string;
+  platformCommentId: string;
+  commentUrl: string | null;
+};
+
 function str(value: unknown) {
   if (typeof value === "string") return value.trim();
   if (typeof value === "number") return String(value);
@@ -88,6 +102,153 @@ function fallbackEventId(input: {
     .slice(0, 24);
 }
 
+function normalizeAccountKey(value: unknown) {
+  const key = str(value)
+    .replace(/^@/, "")
+    .toLowerCase();
+
+  // Keep dashboard account keys consistent.
+  if (
+    key === "indomobil-emotor" ||
+    key === "indomobilemotor" ||
+    key === "im.indomobil"
+  ) {
+    return "im.indomobil";
+  }
+
+  if (
+    key === "imriders" ||
+    key === "imriders.official"
+  ) {
+    return "imriders.official";
+  }
+
+  return key || "im.indomobil";
+}
+
+function normalizeInbound(
+  body: Payload,
+  accountKeyFromQuery: string
+): NormalizedInbound {
+  const directContactBody =
+    body.id ||
+    body.key ||
+    body.last_input_text ||
+    body.live_chat_url
+      ? body
+      : null;
+
+  const fullContact = obj(
+    body.full_contact_data ??
+      body.contact ??
+      body.contact_data ??
+      directContactBody
+  );
+
+  const customFields = obj(
+    body.custom_fields ??
+      fullContact.custom_fields
+  );
+
+  const platform =
+    str(body.platform).toLowerCase() || "instagram";
+
+  const accountKey = normalizeAccountKey(
+    accountKeyFromQuery ||
+      body.account_key ||
+      body.accountKey
+  );
+
+  const contactId = str(
+    body.manychat_contact_id ??
+      body.contact_id ??
+      body.subscriber_id ??
+      body.id ??
+      fullContact.id
+  );
+
+  const displayName =
+    str(
+      body.display_name ??
+        body.name ??
+        fullContact.name ??
+        fullContact.first_name
+    ) || null;
+
+  const username =
+    str(
+      body.username ??
+        body.instagram_username ??
+        customFields.instagram_username ??
+        customFields.username
+    ) || null;
+
+  const messageText = str(
+    body.comment_text ??
+      body.message ??
+      body.text ??
+      body.last_input_text ??
+      fullContact.last_input_text
+  );
+
+  if (!messageText) {
+    throw new Error(
+      "ManyChat payload does not contain message text."
+    );
+  }
+
+  const createdAt =
+    str(
+      body.comment_created_at ??
+        body.created_at ??
+        body.timestamp ??
+        body.last_interaction ??
+        fullContact.last_interaction
+    ) || new Date().toISOString();
+
+  const inboxUrl =
+    str(
+      body.inbox_url ??
+        body.live_chat_url ??
+        fullContact.live_chat_url
+    ) || null;
+
+  const platformContentId =
+    str(
+      body.platform_content_id ??
+        body.content_id ??
+        body.post_id
+    );
+
+  const platformCommentId =
+    str(
+      body.platform_comment_id ??
+        body.comment_id ??
+        body.event_id ??
+        body.message_id
+    ) ||
+    `manychat-${contactId || "unknown"}-${fallbackEventId({
+      contactId: contactId || "unknown",
+      contentId: platformContentId || "direct-message",
+      text: messageText,
+      createdAt
+    })}`;
+
+  return {
+    platform,
+    accountKey,
+    contactId,
+    displayName,
+    username,
+    messageText,
+    createdAt,
+    inboxUrl,
+    platformContentId,
+    platformCommentId,
+    commentUrl: str(body.comment_url) || null
+  };
+}
+
 async function findExisting(
   platform: string,
   platformCommentId: string
@@ -109,16 +270,42 @@ function buildManyChatLinkNote(
   inboxUrl: string | null
 ) {
   return [
-    `ManyChat contact: ${contactId}`,
+    contactId ? `ManyChat contact: ${contactId}` : null,
     inboxUrl ? `Inbox: ${inboxUrl}` : null
   ]
     .filter(Boolean)
     .join(" • ");
 }
 
+async function safeWriteActivity(
+  commentId: string,
+  action: string,
+  actor: string,
+  note?: string | null
+) {
+  try {
+    await writeAutoReplyActivity(
+      commentId,
+      action,
+      actor,
+      note
+    );
+  } catch (error) {
+    console.error("Unable to write auto-reply activity", {
+      commentId,
+      action,
+      error:
+        error instanceof Error
+          ? error.message
+          : String(error)
+    });
+  }
+}
+
 async function loadConversationHistory(
   platform: string,
-  contactId: string
+  contactId: string,
+  currentPlatformCommentId: string
 ): Promise<AutoReplyConversationTurn[]> {
   if (!contactId) return [];
 
@@ -130,16 +317,24 @@ async function loadConversationHistory(
         platform
       )}&platform_comment_id=like.${encodeURIComponent(
         `${prefix}%`
-      )}&select=id,comment_text,created_at&order=created_at.desc&limit=8`
+      )}&select=id,platform_comment_id,comment_text,created_at&order=created_at.desc&limit=9`
     )) as Array<{
       id: string;
+      platform_comment_id: string;
       comment_text: string;
       created_at: string;
     }>;
 
-  if (!comments.length) return [];
+  const previousComments = comments
+    .filter(
+      (row) =>
+        row.platform_comment_id !== currentPlatformCommentId
+    )
+    .slice(0, 8);
 
-  const ids = comments
+  if (!previousComments.length) return [];
+
+  const ids = previousComments
     .map((row) => `"${row.id}"`)
     .join(",");
 
@@ -160,7 +355,7 @@ async function loadConversationHistory(
     replies.map((row) => [row.comment_id, row])
   );
 
-  const chronological = [...comments].reverse();
+  const chronological = [...previousComments].reverse();
   const turns: AutoReplyConversationTurn[] = [];
 
   for (const row of chronological) {
@@ -189,142 +384,145 @@ async function loadConversationHistory(
 }
 
 /**
- * All AI/database work happens here.
+ * Persist the inbound message BEFORE acknowledging ManyChat.
  *
- * The public POST handler below acknowledges ManyChat immediately.
- * Next.js `after()` keeps this work alive after the HTTP response,
- * so Gemini latency no longer consumes ManyChat's 10-second response window.
+ * This guarantees that a Gemini outage cannot make a customer
+ * message disappear from the dashboard.
  */
-async function processInbound(body: Payload) {
-  try {
-    const directContactBody =
-      body.id ||
-      body.key ||
-      body.last_input_text ||
-      body.live_chat_url
-        ? body
-        : null;
+async function persistInbound(
+  inbound: NormalizedInbound
+) {
+  const existing = await findExisting(
+    inbound.platform,
+    inbound.platformCommentId
+  );
 
-    const fullContact = obj(
-      body.full_contact_data ??
-        body.contact ??
-        body.contact_data ??
-        directContactBody
-    );
+  if (existing) {
+    return {
+      commentId: existing.id,
+      duplicate: true
+    };
+  }
 
-    const customFields = obj(
-      body.custom_fields ??
-        fullContact.custom_fields
-    );
+  const commentRows =
+    (await autoReplySupabaseRequest(
+      "/rest/v1/social_comments",
+      {
+        method: "POST",
+        headers: {
+          Prefer: "return=representation"
+        },
+        body: JSON.stringify({
+          platform: inbound.platform,
+          account_key: inbound.accountKey,
+          platform_comment_id:
+            inbound.platformCommentId,
+          platform_content_id:
+            inbound.platformContentId || null,
+          username: inbound.username,
+          user_display_name: inbound.displayName,
+          comment_text: inbound.messageText,
+          comment_url: inbound.commentUrl,
+          comment_created_at: inbound.createdAt,
 
-    const platform =
-      str(body.platform).toLowerCase() || "instagram";
+          // Visible in Approval Inbox immediately.
+          intent: "AI_PENDING",
+          sentiment: null,
+          priority: "normal",
+          ai_confidence: null,
+          status: "PENDING_APPROVAL",
 
-    const contactId = str(
-      body.manychat_contact_id ??
-        body.contact_id ??
-        body.subscriber_id ??
-        body.id ??
-        fullContact.id
-    );
-
-    const displayName =
-      str(
-        body.display_name ??
-          body.name ??
-          fullContact.name ??
-          fullContact.first_name
-      ) || null;
-
-    const username =
-      str(
-        body.username ??
-          body.instagram_username ??
-          customFields.instagram_username ??
-          customFields.username
-      ) || null;
-
-    const messageText = str(
-      body.comment_text ??
-        body.message ??
-        body.text ??
-        body.last_input_text ??
-        fullContact.last_input_text
-    );
-
-    if (!messageText) {
-      console.error(
-        "ManyChat background processing: no message text received."
-      );
-      return;
-    }
-
-    const createdAt =
-      str(
-        body.comment_created_at ??
-          body.created_at ??
-          body.timestamp ??
-          body.last_interaction ??
-          fullContact.last_interaction
-      ) || new Date().toISOString();
-
-    const inboxUrl =
-      str(
-        body.inbox_url ??
-          body.live_chat_url ??
-          fullContact.live_chat_url
-      ) || null;
-
-    const platformContentId =
-      str(
-        body.platform_content_id ??
-          body.content_id ??
-          body.post_id
-      );
-
-    const platformCommentId =
-      str(
-        body.platform_comment_id ??
-          body.comment_id ??
-          body.event_id ??
-          body.message_id
-      ) ||
-      `manychat-${contactId || "unknown"}-${fallbackEventId({
-        contactId: contactId || "unknown",
-        contentId: platformContentId || "direct-message",
-        text: messageText,
-        createdAt
-      })}`;
-
-    const existing = await findExisting(
-      platform,
-      platformCommentId
-    );
-
-    if (existing) {
-      if (contactId) {
-        await writeAutoReplyActivity(
-          existing.id,
-          "MANYCHAT_CONTACT_LINKED",
-          "ManyChat Collector",
-          buildManyChatLinkNote(contactId, inboxUrl)
-        );
+          updated_at: new Date().toISOString()
+        })
       }
+    )) as Array<{ id: string }>;
 
-      return;
+  const commentId = commentRows[0]?.id;
+
+  if (!commentId) {
+    throw new Error(
+      "Supabase did not return a message ID."
+    );
+  }
+
+  await safeWriteActivity(
+    commentId,
+    "MANYCHAT_RECEIVED",
+    "ManyChat Collector",
+    [
+      `Account: @${inbound.accountKey}`,
+      buildManyChatLinkNote(
+        inbound.contactId,
+        inbound.inboxUrl
+      )
+    ]
+      .filter(Boolean)
+      .join(" • ")
+  );
+
+  return {
+    commentId,
+    duplicate: false
+  };
+}
+
+async function insertReplyResult(input: {
+  commentId: string;
+  aiDraft: string | null;
+  aiModel: string | null;
+  aiConfidence: number | null;
+  errorMessage: string | null;
+}) {
+  await autoReplySupabaseRequest(
+    "/rest/v1/social_comment_replies",
+    {
+      method: "POST",
+      headers: {
+        Prefer: "return=minimal"
+      },
+      body: JSON.stringify({
+        comment_id: input.commentId,
+        ai_draft: input.aiDraft,
+        final_reply: null,
+        ai_model: input.aiModel,
+        ai_confidence: input.aiConfidence,
+        error_message: input.errorMessage,
+        updated_at: new Date().toISOString()
+      })
     }
+  );
+}
 
+function errorMessage(error: unknown) {
+  const message =
+    error instanceof Error
+      ? error.message
+      : String(error);
+
+  return message.slice(0, 1000);
+}
+
+/**
+ * Runs only AFTER the customer message has already been saved
+ * and ManyChat has received a successful acknowledgement.
+ */
+async function processAI(
+  inbound: NormalizedInbound,
+  commentId: string
+) {
+  try {
     const conversationHistory =
       await loadConversationHistory(
-        platform,
-        contactId
+        inbound.platform,
+        inbound.contactId,
+        inbound.platformCommentId
       );
 
     const draft = await generateCustomerServiceDraft({
-      platform,
-      customerName: displayName,
-      username,
-      commentText: messageText,
+      platform: inbound.platform,
+      customerName: inbound.displayName,
+      username: inbound.username,
+      commentText: inbound.messageText,
       conversationHistory
     });
 
@@ -332,70 +530,40 @@ async function processInbound(body: Payload) {
       throw new Error("AI draft is empty.");
     }
 
-    const commentRows =
-      (await autoReplySupabaseRequest(
-        "/rest/v1/social_comments",
-        {
-          method: "POST",
-          headers: {
-            Prefer: "return=representation"
-          },
-          body: JSON.stringify({
-            platform,
-            account_key:
-              str(body.account_key) || "indomobil-emotor",
-            platform_comment_id: platformCommentId,
-            platform_content_id:
-              platformContentId || null,
-            username,
-            user_display_name: displayName,
-            comment_text: messageText,
-            comment_url:
-              str(body.comment_url) || null,
-            comment_created_at: createdAt,
-            intent: draft.intent,
-            sentiment: draft.sentiment.toLowerCase(),
-            priority:
-              draft.priority === "HIGH"
-                ? "urgent"
-                : draft.priority === "LOW"
-                  ? "low"
-                  : "normal",
-            ai_confidence: draft.confidence,
-            status: "PENDING_APPROVAL",
-            updated_at: new Date().toISOString()
-          })
-        }
-      )) as Array<{ id: string }>;
-
-    const commentId = commentRows[0]?.id;
-
-    if (!commentId) {
-      throw new Error(
-        "Supabase did not return a message ID."
-      );
-    }
-
     await autoReplySupabaseRequest(
-      "/rest/v1/social_comment_replies",
+      `/rest/v1/social_comments?id=eq.${encodeURIComponent(
+        commentId
+      )}`,
       {
-        method: "POST",
+        method: "PATCH",
         headers: {
           Prefer: "return=minimal"
         },
         body: JSON.stringify({
-          comment_id: commentId,
-          ai_draft: draft.draftReply,
-          final_reply: null,
-          ai_model: draft.model,
+          intent: draft.intent,
+          sentiment: draft.sentiment.toLowerCase(),
+          priority:
+            draft.priority === "HIGH"
+              ? "urgent"
+              : draft.priority === "LOW"
+                ? "low"
+                : "normal",
           ai_confidence: draft.confidence,
-          error_message: null,
+          status: "PENDING_APPROVAL",
           updated_at: new Date().toISOString()
         })
       }
     );
 
-    await writeAutoReplyActivity(
+    await insertReplyResult({
+      commentId,
+      aiDraft: draft.draftReply,
+      aiModel: draft.model,
+      aiConfidence: draft.confidence,
+      errorMessage: null
+    });
+
+    await safeWriteActivity(
       commentId,
       "AI_DRAFTED",
       "Vercel AI",
@@ -410,10 +578,12 @@ async function processInbound(body: Payload) {
         conversationHistory.length
           ? `Conversation context: ${conversationHistory.length} prior turns.`
           : "No prior conversation context.",
-        contactId
-          ? `ManyChat contact: ${contactId}`
+        inbound.contactId
+          ? `ManyChat contact: ${inbound.contactId}`
           : null,
-        inboxUrl ? `Inbox: ${inboxUrl}` : null
+        inbound.inboxUrl
+          ? `Inbox: ${inbound.inboxUrl}`
+          : null
       ]
         .filter(Boolean)
         .join(" • ")
@@ -423,28 +593,91 @@ async function processInbound(body: Payload) {
       "ManyChat background processing complete",
       {
         commentId,
-        platform,
-        accountKey:
-          str(body.account_key) || "indomobil-emotor",
+        platform: inbound.platform,
+        accountKey: inbound.accountKey,
         conversationTurns:
-          conversationHistory.length
+          conversationHistory.length,
+        aiModel: draft.model
       }
     );
   } catch (error) {
+    const message = errorMessage(error);
+
     console.error(
       "ManyChat background AI draft error",
-      error
+      {
+        commentId,
+        platform: inbound.platform,
+        accountKey: inbound.accountKey,
+        error: message
+      }
+    );
+
+    // Keep the message visible in the human approval queue.
+    try {
+      await autoReplySupabaseRequest(
+        `/rest/v1/social_comments?id=eq.${encodeURIComponent(
+          commentId
+        )}`,
+        {
+          method: "PATCH",
+          headers: {
+            Prefer: "return=minimal"
+          },
+          body: JSON.stringify({
+            intent: "AI_ERROR",
+            ai_confidence: null,
+            status: "PENDING_APPROVAL",
+            updated_at: new Date().toISOString()
+          })
+        }
+      );
+    } catch (updateError) {
+      console.error(
+        "Unable to mark inbound message as AI_ERROR",
+        updateError
+      );
+    }
+
+    try {
+      await insertReplyResult({
+        commentId,
+        aiDraft: null,
+        aiModel:
+          process.env.AUTO_REPLY_GEMINI_MODEL ||
+          process.env.GEMINI_MODEL ||
+          "gemini-3.8-flash",
+        aiConfidence: null,
+        errorMessage: message
+      });
+    } catch (replyError) {
+      console.error(
+        "Unable to store AI error detail",
+        replyError
+      );
+    }
+
+    await safeWriteActivity(
+      commentId,
+      "AI_DRAFT_FAILED",
+      "Vercel AI",
+      `Message kept in approval queue. ${message}`
     );
   }
 }
 
 /**
- * Fast acknowledgement endpoint for ManyChat.
+ * ManyChat inbound endpoint.
  *
- * IMPORTANT:
- * ManyChat has a 10-second External Request timeout.
- * We authenticate and parse the request, schedule the actual
- * AI/database work with Next.js `after()`, then return 200 immediately.
+ * Final flow:
+ * 1. Authenticate request.
+ * 2. Read ?account_key=... from the webhook URL.
+ * 3. Parse and persist the inbound message to Supabase.
+ * 4. Return HTTP 200 to ManyChat.
+ * 5. Generate the Gemini draft in Next.js after().
+ *
+ * Example:
+ * /api/auto-reply/manychat/inbound?account_key=imriders.official
  */
 export async function POST(request: NextRequest) {
   try {
@@ -457,14 +690,53 @@ export async function POST(request: NextRequest) {
 
     const body = (await request.json()) as Payload;
 
+    const accountKeyFromQuery =
+      request.nextUrl.searchParams.get(
+        "account_key"
+      ) || "";
+
+    const inbound = normalizeInbound(
+      body,
+      accountKeyFromQuery
+    );
+
+    const persisted = await persistInbound(inbound);
+
+    if (persisted.duplicate) {
+      after(async () => {
+        await safeWriteActivity(
+          persisted.commentId,
+          "MANYCHAT_DUPLICATE_RECEIVED",
+          "ManyChat Collector",
+          buildManyChatLinkNote(
+            inbound.contactId,
+            inbound.inboxUrl
+          )
+        );
+      });
+
+      return NextResponse.json(
+        {
+          ok: true,
+          received: true,
+          duplicate: true
+        },
+        { status: 200 }
+      );
+    }
+
     after(async () => {
-      await processInbound(body);
+      await processAI(
+        inbound,
+        persisted.commentId
+      );
     });
 
     return NextResponse.json(
       {
         ok: true,
         received: true,
+        persisted: true,
         processing: "BACKGROUND"
       },
       { status: 200 }
