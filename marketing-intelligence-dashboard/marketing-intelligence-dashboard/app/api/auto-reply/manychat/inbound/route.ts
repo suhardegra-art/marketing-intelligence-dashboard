@@ -506,12 +506,13 @@ async function persistInbound(
           comment_url: inbound.commentUrl,
           comment_created_at: inbound.createdAt,
 
-          // Visible in Approval Inbox immediately.
+          // Keep the message out of the Approval Inbox while AI decides
+          // whether it can be sent directly or needs human approval.
           intent: "AI_PENDING",
           sentiment: null,
           priority: "normal",
           ai_confidence: null,
-          status: "PENDING_APPROVAL",
+          status: "NEW",
 
           updated_at: new Date().toISOString()
         })
@@ -712,7 +713,11 @@ async function processAI(
                 ? "low"
                 : "normal",
           ai_confidence: draft.confidence,
-          status: "PENDING_APPROVAL",
+          // Direct-send candidates stay out of the approval queue.
+          // They become AUTO_REPLIED after a successful ManyChat send.
+          // If sending fails, markDirectSendFailure() moves them to
+          // PENDING_APPROVAL so a human can handle them.
+          status: directSend ? "NEW" : "PENDING_APPROVAL",
           updated_at: new Date().toISOString()
         })
       }
