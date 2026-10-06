@@ -7,7 +7,14 @@ type Platform="all"|"instagram"|"tiktok"|"facebook"|"youtube";
 type Action="approve"|"escalate"|"retry_ai";
 
 const SIZE=10;
-const FALLBACK_REPLY="Halo Kak, pesan Kakak sudah kami terima. Mohon tunggu sebentar ya Kak, tim kami akan membantu memberikan informasi lebih lanjut. -IM";
+const GENERIC_FALLBACK_REPLY="Halo Kak, pesan Kakak sudah kami terima. Mohon tunggu sebentar ya Kak, tim kami akan membantu memberikan informasi lebih lanjut. -IM";
+const PURCHASE_FALLBACK_REPLY=`Siap Kak, kami bantu proses pembeliannya. Boleh lengkapi data berikut ya Kak:
+Nama:
+No. WhatsApp:
+Domisili/Kota:
+Unit yang diminati:
+Warna yang diinginkan:
+Setelah datanya lengkap, tim kami akan bantu proses selanjutnya. -IM`;
 
 const accounts=[
  {key:"all",label:"All Accounts",sub:"All connected accounts"},
@@ -24,7 +31,15 @@ const platformIcon=(p:string)=>platforms.find(x=>x.key===p)?.icon||"•";
 const fmt=(v:string|null)=>v?new Intl.DateTimeFormat("en-GB",{day:"2-digit",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"}).format(new Date(v)):"—";
 const confStyle=(v:number|null)=>v===null?{background:"#f2f4f7",color:"#667085"}:v>=90?{background:"#eafaf2",color:"#087443"}:{background:"#fff5e8",color:"#b54708"};
 const sourceStyle=(s:"DM"|"COMMENT")=>s==="DM"?{background:"#eeeaff",color:"#634fd2"}:{background:"#eaf4ff",color:"#2767c7"};
-const draftFor=(c:AutoReplyComment)=>c.reply?.finalReply||c.reply?.aiDraft||(c.intent==="AI_ERROR"?FALLBACK_REPLY:"");
+
+function looksLikePurchaseIntent(value:string){
+ return /\b(beli|pembelian|mau beli|ingin beli|order|booking|spk|ambil unit|ambil motor|pesan unit|cash|kredit|sales|salesman)\b/i.test(value);
+}
+function fallbackFor(c:AutoReplyComment){
+ if(looksLikePurchaseIntent(c.commentText))return PURCHASE_FALLBACK_REPLY;
+ return GENERIC_FALLBACK_REPLY;
+}
+const draftFor=(c:AutoReplyComment)=>c.reply?.finalReply||c.reply?.aiDraft||(c.intent==="AI_ERROR"?fallbackFor(c):"");
 
 function Pager({page,total,setPage}:{page:number;total:number;setPage:(p:number)=>void}){
  const pages=Math.max(1,Math.ceil(total/SIZE)); if(pages<=1)return null;

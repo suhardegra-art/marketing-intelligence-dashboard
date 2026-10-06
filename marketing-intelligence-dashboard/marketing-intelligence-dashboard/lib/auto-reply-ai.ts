@@ -174,7 +174,6 @@ function retryDelayMs(attempt: number, retryAfterMs: number | null) {
     return Math.min(retryAfterMs, 5000);
   }
 
-  // 800ms, 1600ms, 3200ms ... with a small jitter.
   const exponential = 800 * 2 ** Math.max(0, attempt - 1);
   const jitter = Math.floor(Math.random() * 250);
 
@@ -184,7 +183,6 @@ function retryDelayMs(attempt: number, retryAfterMs: number | null) {
 function shouldRetry(error: unknown) {
   if (error instanceof GeminiRequestError) {
     if (error.status == null) {
-      // Network error / timeout.
       return true;
     }
 
@@ -390,7 +388,9 @@ export async function generateCustomerServiceDraft(input: {
 ${AUTO_REPLY_KNOWLEDGE}
 
 TASK
-Create one customer-service reply candidate. The server may automatically send only narrowly allowed, high-confidence categories; all other categories remain in the human approval queue.
+Create one customer-service reply candidate.
+The reply should be ready for a human reviewer to approve with minimal or no editing.
+The server may automatically send only narrowly allowed high-confidence categories; PURCHASE_INTENT and sensitive/dynamic categories remain in human approval.
 
 Channel:
 ${input.platform}
@@ -409,17 +409,40 @@ Return exactly one of:
 PRICE, DEALER, CORPORATE, PRODUCT, PROMO, INSTALLMENT, STOCK, DELIVERY, PURCHASE_INTENT, COMPLAINT, TECHNICAL, WARRANTY, TRANSACTION, GENERAL, OTHER.
 
 CLASSIFICATION RULES
-- PRICE: price / OTR questions or a clarification needed to answer a price question.
-- DEALER: dealer location, dealer availability in an area, test ride through dealer, or official dealer-page questions.
+- PURCHASE_INTENT has priority when the customer explicitly says they want to buy, order, booking, SPK, take/ambil a unit, pay a booking fee, buy cash/credit, asks to be contacted by sales, or asks for help with a purchase.
+- If the customer explicitly shows PURCHASE_INTENT and also asks price/dealer information, keep intent as PURCHASE_INTENT. Answer any verified price/dealer question first, then continue the purchase lead-data collection.
+- PRICE: use only when the message is primarily a price / OTR question and there is no explicit purchase commitment.
+- DEALER: dealer location, dealer availability in an area, test ride through dealer, or official dealer-page questions without explicit purchase commitment.
 - CORPORATE: PT Indomobil Emotor Internasional, Indomobil Group, TKDN, local assembly, official website, or other verified corporate facts.
 - PRODUCT: specifications, features, colors, range, speed, battery, charger, etc.
-- PURCHASE_INTENT: customer explicitly says they want to buy/order/contact sales, unless the latest question is specifically PRICE or DEALER.
-- PROMO / INSTALLMENT / STOCK / DELIVERY / TRANSACTION: use these when the latest question is specifically about those dynamic/transactional topics.
+- PROMO / INSTALLMENT / STOCK / DELIVERY / TRANSACTION: use these when the latest request is specifically about those dynamic/transactional topics and there is no stronger purchase-intent context.
 - COMPLAINT / TECHNICAL / WARRANTY: use for complaints, faults, service issues, warranty, breakdown, battery/charger failure, or safety concerns.
 
-RULES
+PURCHASE INTENT RULES
+For PURCHASE_INTENT, inspect the latest message AND previous conversation for these five fields:
+1. Full name
+2. Active WhatsApp number
+3. Location / city / regency
+4. Desired unit / model
+5. Desired color
+
+Then:
+- Ask only for missing fields.
+- Never ask again for fields already provided.
+- If 3 or more fields are missing, use a compact fill-in list.
+- If only 1-2 fields are missing, ask naturally in one short sentence.
+- If all five are complete, confirm the captured data briefly and say it is ready to be followed up by the sales team.
+- Never claim a sales person has already called, contacted, been assigned, or processed the lead.
+- If the customer asks a verified price in the same purchase conversation, answer it first, then collect only missing lead fields.
+- Do not invent stock, promo, installment, delivery time, or dealer availability.
+- Set needs_confirmation=false for simple lead-data collection.
+- Set needs_confirmation=true when the answer depends on current stock, promo, installment/DP, delivery, or another dynamic fact.
+- For PURCHASE_INTENT, the internal note MUST summarize known fields and missing fields, for example:
+  "Lead data — Name: known; WhatsApp: missing; Location: Bandung; Unit: Tyranno; Color: missing. Missing: WhatsApp, Color."
+
+GENERAL RULES
 - Read PREVIOUS CONVERSATION before answering.
-- Preserve known context from previous turns. Do not ask again for information the customer already gave.
+- Preserve known context from previous turns.
 - Answer the actual latest question first.
 - Use only the knowledge above plus explicit facts in the conversation.
 - Never claim that follow-up has already happened.
@@ -435,7 +458,6 @@ RULES
 - For verified CORPORATE facts explicitly contained in the knowledge, set needs_confirmation=false.
 - Complaints and technical issues may be drafted, but do not diagnose an unseen fault.
 - Serious complaints, safety issues, accidents, breakdowns, battery/charger failures, warranty claims, refund/cancel, transaction, dealer or sales complaints should normally be priority HIGH.
-- Missing or dynamic information that cannot be safely handled with a simple clarification question should set needs_confirmation=true.
 `.trim();
 
   let selectedModel = primaryModel;
