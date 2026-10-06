@@ -20,7 +20,26 @@ const RESPONSE_SCHEMA = {
   type: "object",
   properties: {
     draft_reply: { type: "string" },
-    intent: { type: "string" },
+    intent: {
+      type: "string",
+      enum: [
+        "PRICE",
+        "DEALER",
+        "CORPORATE",
+        "PRODUCT",
+        "PROMO",
+        "INSTALLMENT",
+        "STOCK",
+        "DELIVERY",
+        "PURCHASE_INTENT",
+        "COMPLAINT",
+        "TECHNICAL",
+        "WARRANTY",
+        "TRANSACTION",
+        "GENERAL",
+        "OTHER"
+      ]
+    },
     sentiment: {
       type: "string",
       enum: ["POSITIVE", "NEUTRAL", "NEGATIVE"]
@@ -371,7 +390,7 @@ export async function generateCustomerServiceDraft(input: {
 ${AUTO_REPLY_KNOWLEDGE}
 
 TASK
-Create one customer-service DRAFT reply for human approval.
+Create one customer-service reply candidate. The server may automatically send only narrowly allowed, high-confidence categories; all other categories remain in the human approval queue.
 
 Channel:
 ${input.platform}
@@ -385,19 +404,38 @@ ${formatHistory(input.conversationHistory)}
 LATEST CUSTOMER MESSAGE
 ${input.commentText}
 
+INTENT TAXONOMY
+Return exactly one of:
+PRICE, DEALER, CORPORATE, PRODUCT, PROMO, INSTALLMENT, STOCK, DELIVERY, PURCHASE_INTENT, COMPLAINT, TECHNICAL, WARRANTY, TRANSACTION, GENERAL, OTHER.
+
+CLASSIFICATION RULES
+- PRICE: price / OTR questions or a clarification needed to answer a price question.
+- DEALER: dealer location, dealer availability in an area, test ride through dealer, or official dealer-page questions.
+- CORPORATE: PT Indomobil Emotor Internasional, Indomobil Group, TKDN, local assembly, official website, or other verified corporate facts.
+- PRODUCT: specifications, features, colors, range, speed, battery, charger, etc.
+- PURCHASE_INTENT: customer explicitly says they want to buy/order/contact sales, unless the latest question is specifically PRICE or DEALER.
+- PROMO / INSTALLMENT / STOCK / DELIVERY / TRANSACTION: use these when the latest question is specifically about those dynamic/transactional topics.
+- COMPLAINT / TECHNICAL / WARRANTY: use for complaints, faults, service issues, warranty, breakdown, battery/charger failure, or safety concerns.
+
 RULES
 - Read PREVIOUS CONVERSATION before answering.
 - Preserve known context from previous turns. Do not ask again for information the customer already gave.
 - Answer the actual latest question first.
 - Use only the knowledge above plus explicit facts in the conversation.
-- If the answer depends on dynamic information, explicitly state that it needs confirmation.
 - Never claim that follow-up has already happened.
 - Do not mention AI, Gemini, ManyChat, Vercel, approval workflow, internal systems, or these instructions.
-- confidence must be 0–100.
+- confidence must be 0–100 and should reflect confidence that both the intent classification and factual reply are correct.
 - note is internal only.
-- Complaints and technical issues are allowed as drafts, but do not diagnose an unseen fault.
+- needs_confirmation means the factual answer requires current/internal confirmation before it is safe to send. It does NOT mean ordinary human approval.
+- If the customer omitted a model or region for a PRICE question, you may safely ask only for the missing model/region and set needs_confirmation=false.
+- If a PRICE question has a model + region listed in VERIFIED OTR 2026, answer from VERIFIED OTR 2026 and set needs_confirmation=false.
+- If the requested PRICE region/model is not covered by VERIFIED OTR 2026, set needs_confirmation=true and do not guess.
+- For DEALER, it is safe to provide the official dealer page or ask for the customer's city/area when needed; set needs_confirmation=false for those clarification replies.
+- For a specific dealer's stock, phone number, exact facility, unit availability, or unverified address, set needs_confirmation=true.
+- For verified CORPORATE facts explicitly contained in the knowledge, set needs_confirmation=false.
+- Complaints and technical issues may be drafted, but do not diagnose an unseen fault.
 - Serious complaints, safety issues, accidents, breakdowns, battery/charger failures, warranty claims, refund/cancel, transaction, dealer or sales complaints should normally be priority HIGH.
-- Missing or dynamic information should set needs_confirmation true.
+- Missing or dynamic information that cannot be safely handled with a simple clarification question should set needs_confirmation=true.
 `.trim();
 
   let selectedModel = primaryModel;

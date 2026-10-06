@@ -8,13 +8,94 @@ import {
 
 import {
   generateCustomerServiceDraft,
-  type AutoReplyConversationTurn
+  type AutoReplyConversationTurn,
+  type AutoReplyAIDraft
 } from "@/lib/auto-reply-ai";
+
+import {
+  sendManyChatInstagramText
+} from "@/lib/manychat";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 type Payload = Record<string, any>;
+
+const DIRECT_SEND_INTENTS = new Set([
+  "PRICE",
+  "DEALER",
+  "CORPORATE"
+]);
+
+function directSendEnabled() {
+  return (
+    process.env.AUTO_REPLY_DIRECT_SEND_ENABLED?.trim().toLowerCase() !==
+    "false"
+  );
+}
+
+function directSendMinConfidence() {
+  const raw = Number(
+    process.env.AUTO_REPLY_DIRECT_SEND_MIN_CONFIDENCE || "90"
+  );
+
+  if (!Number.isFinite(raw)) return 90;
+
+  return Math.max(0, Math.min(100, raw));
+}
+
+function directSendAccounts() {
+  const raw =
+    process.env.AUTO_REPLY_DIRECT_SEND_ACCOUNTS ||
+    "imriders.official";
+
+  return new Set(
+    raw
+      .split(",")
+      .map((value) =>
+        value.trim().replace(/^@/, "").toLowerCase()
+      )
+      .filter(Boolean)
+  );
+}
+
+function normalizeIntent(value: string) {
+  return value.trim().toUpperCase().replace(/\s+/g, "_");
+}
+
+function shouldDirectSend(
+  inbound: NormalizedInbound,
+  draft: AutoReplyAIDraft
+) {
+  if (!directSendEnabled()) return false;
+
+  if (inbound.platform !== "instagram") return false;
+
+  if (!directSendAccounts().has(inbound.accountKey)) {
+    return false;
+  }
+
+  if (!/^\d+$/.test(inbound.contactId)) {
+    return false;
+  }
+
+  const intent = normalizeIntent(draft.intent);
+
+  if (!DIRECT_SEND_INTENTS.has(intent)) {
+    return false;
+  }
+
+  if (draft.needsConfirmation) {
+    return false;
+  }
+
+  if (draft.priority === "HIGH") {
+    return false;
+  }
+
+  return draft.confidence >= directSendMinConfidence();
+}
+
 
 type NormalizedInbound = {
   platform: string;
@@ -493,6 +574,85 @@ async function insertReplyResult(input: {
   );
 }
 
+async function markDirectSendSuccess(input: {
+  commentId: string;
+  finalReply: string;
+  sentAt: string;
+}) {
+  await Promise.all([
+    autoReplySupabaseRequest(
+      `/rest/v1/social_comment_replies?comment_id=eq.${encodeURIComponent(
+        input.commentId
+      )}`,
+      {
+        method: "PATCH",
+        headers: {
+          Prefer: "return=minimal"
+        },
+        body: JSON.stringify({
+          final_reply: input.finalReply,
+          sent_at: input.sentAt,
+          error_message: null,
+          updated_at: input.sentAt
+        })
+      }
+    ),
+    autoReplySupabaseRequest(
+      `/rest/v1/social_comments?id=eq.${encodeURIComponent(
+        input.commentId
+      )}`,
+      {
+        method: "PATCH",
+        headers: {
+          Prefer: "return=minimal"
+        },
+        body: JSON.stringify({
+          status: "AUTO_REPLIED",
+          updated_at: input.sentAt
+        })
+      }
+    )
+  ]);
+}
+
+async function markDirectSendFailure(
+  commentId: string,
+  message: string
+) {
+  await Promise.all([
+    autoReplySupabaseRequest(
+      `/rest/v1/social_comment_replies?comment_id=eq.${encodeURIComponent(
+        commentId
+      )}`,
+      {
+        method: "PATCH",
+        headers: {
+          Prefer: "return=minimal"
+        },
+        body: JSON.stringify({
+          error_message: message.slice(0, 1000),
+          updated_at: new Date().toISOString()
+        })
+      }
+    ),
+    autoReplySupabaseRequest(
+      `/rest/v1/social_comments?id=eq.${encodeURIComponent(
+        commentId
+      )}`,
+      {
+        method: "PATCH",
+        headers: {
+          Prefer: "return=minimal"
+        },
+        body: JSON.stringify({
+          status: "PENDING_APPROVAL",
+          updated_at: new Date().toISOString()
+        })
+      }
+    )
+  ]);
+}
+
 function errorMessage(error: unknown) {
   const message =
     error instanceof Error
@@ -530,6 +690,9 @@ async function processAI(
       throw new Error("AI draft is empty.");
     }
 
+    const normalizedIntent = normalizeIntent(draft.intent);
+    const directSend = shouldDirectSend(inbound, draft);
+
     await autoReplySupabaseRequest(
       `/rest/v1/social_comments?id=eq.${encodeURIComponent(
         commentId
@@ -540,7 +703,7 @@ async function processAI(
           Prefer: "return=minimal"
         },
         body: JSON.stringify({
-          intent: draft.intent,
+          intent: normalizedIntent,
           sentiment: draft.sentiment.toLowerCase(),
           priority:
             draft.priority === "HIGH"
@@ -568,9 +731,13 @@ async function processAI(
       "AI_DRAFTED",
       "Vercel AI",
       [
-        draft.needsConfirmation
-          ? "Needs information confirmation."
-          : "Draft generated for human approval.",
+        directSend
+          ? "Eligible for direct auto reply."
+          : draft.needsConfirmation
+            ? "Needs information confirmation."
+            : "Draft generated for human approval.",
+        `Intent: ${normalizedIntent}.`,
+        `Confidence: ${draft.confidence}%.`,
         draft.priority === "HIGH"
           ? "High-priority review."
           : null,
@@ -589,12 +756,84 @@ async function processAI(
         .join(" • ")
     );
 
+    if (directSend) {
+      try {
+        await sendManyChatInstagramText(
+          inbound.contactId,
+          draft.draftReply
+        );
+
+        const sentAt = new Date().toISOString();
+
+        await markDirectSendSuccess({
+          commentId,
+          finalReply: draft.draftReply,
+          sentAt
+        });
+
+        await safeWriteActivity(
+          commentId,
+          "AUTO_REPLIED",
+          "Vercel AI + ManyChat",
+          [
+            `Direct reply sent automatically.`,
+            `Intent: ${normalizedIntent}.`,
+            `Confidence: ${draft.confidence}%.`,
+            `ManyChat contact: ${inbound.contactId}.`
+          ].join(" • ")
+        );
+
+        console.log(
+          "ManyChat direct auto reply complete",
+          {
+            commentId,
+            platform: inbound.platform,
+            accountKey: inbound.accountKey,
+            intent: normalizedIntent,
+            confidence: draft.confidence,
+            aiModel: draft.model
+          }
+        );
+
+        return;
+      } catch (sendError) {
+        const sendMessage = errorMessage(sendError);
+
+        await markDirectSendFailure(
+          commentId,
+          sendMessage
+        );
+
+        await safeWriteActivity(
+          commentId,
+          "AUTO_REPLY_SEND_FAILED",
+          "ManyChat Dispatcher",
+          `Automatic send failed; message kept in approval queue. ${sendMessage}`
+        );
+
+        console.error(
+          "ManyChat direct auto reply send failed",
+          {
+            commentId,
+            accountKey: inbound.accountKey,
+            intent: normalizedIntent,
+            error: sendMessage
+          }
+        );
+
+        return;
+      }
+    }
+
     console.log(
       "ManyChat background processing complete",
       {
         commentId,
         platform: inbound.platform,
         accountKey: inbound.accountKey,
+        intent: normalizedIntent,
+        confidence: draft.confidence,
+        directSend: false,
         conversationTurns:
           conversationHistory.length,
         aiModel: draft.model
