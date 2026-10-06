@@ -14,5 +14,63 @@ function source(row:any):"DM"|"COMMENT"{const id=String(row.platform_comment_id|
 function map(row:any,reply:any):AutoReplyComment{return{id:row.id,platform:row.platform,accountKey:row.account_key||null,platformCommentId:row.platform_comment_id,platformContentId:row.platform_content_id||null,username:row.username||null,displayName:row.user_display_name||null,commentText:row.comment_text||"",commentUrl:row.comment_url||null,commentCreatedAt:row.comment_created_at||null,sourceType:source(row),intent:row.intent||null,sentiment:row.sentiment||null,priority:row.priority||"normal",aiConfidence:row.ai_confidence==null?null:Number(row.ai_confidence),status:row.status,createdAt:row.created_at,updatedAt:row.updated_at,reply:reply?{id:reply.id,aiDraft:reply.ai_draft||null,finalReply:reply.final_reply||null,aiModel:reply.ai_model||null,aiConfidence:reply.ai_confidence==null?null:Number(reply.ai_confidence),approvedBy:reply.approved_by||null,approvedAt:reply.approved_at||null,sentAt:reply.sent_at||null,errorMessage:reply.error_message||null}:null}}
 async function replies(ids:string[]){if(!ids.length)return new Map();const q=ids.map(id=>`"${id}"`).join(",");const rows=await autoReplySupabaseRequest(`/rest/v1/social_comment_replies?comment_id=in.(${encodeURIComponent(q)})&select=*&limit=500`) as any[];return new Map(rows.map(x=>[x.comment_id,x]))}
 async function autoReplied():Promise<AutoReplyComment[]>{const rr=await autoReplySupabaseRequest(`/rest/v1/social_comment_replies?sent_at=not.is.null&select=*&order=sent_at.desc&limit=500`) as any[];if(!rr.length)return[];const ids=Array.from(new Set(rr.map(x=>x.comment_id).filter(Boolean)));const q=ids.map(id=>`"${id}"`).join(",");const cr=await autoReplySupabaseRequest(`/rest/v1/social_comments?id=in.(${encodeURIComponent(q)})&select=*&limit=500`) as any[];const by=new Map(rr.map(x=>[x.comment_id,x]));return cr.map(x=>map(x,by.get(x.id))).filter(x=>x.reply?.sentAt).sort((a,b)=>new Date(b.reply!.sentAt||b.updatedAt).getTime()-new Date(a.reply!.sentAt||a.updatedAt).getTime())}
-export async function getAutoReplyDashboardData():Promise<AutoReplyDashboardData>{const [newComments,pendingApproval,aiDraftReady,replied,escalated,pendingRows,activities,auto]=await Promise.all([count("NEW"),count("PENDING_APPROVAL"),count("AI_DRAFTED"),repliedToday(),count("ESCALATED"),autoReplySupabaseRequest(`/rest/v1/social_comments?status=in.(PENDING_APPROVAL,AI_DRAFTED)&select=*&order=created_at.desc&limit=500`) as Promise<any[]>,autoReplySupabaseRequest(`/rest/v1/social_comment_activity?select=*&order=created_at.desc&limit=100`) as Promise<any[]>,autoReplied()]);const pr=await replies(pendingRows.map(x=>x.id));const pending=pendingRows.map(x=>map(x,pr.get(x.id)));const ids=Array.from(new Set(activities.map(x=>x.comment_id).filter(Boolean)));let comments:any[]=[],replyRows:any[]=[];if(ids.length){const q=ids.map(id=>`"${id}"`).join(",");[comments,replyRows]=await Promise.all([autoReplySupabaseRequest(`/rest/v1/social_comments?id=in.(${encodeURIComponent(q)})&select=id,platform,account_key,platform_comment_id,platform_content_id,comment_url,comment_text&limit=500`) as Promise<any[]>,autoReplySupabaseRequest(`/rest/v1/social_comment_replies?comment_id=in.(${encodeURIComponent(q)})&select=comment_id,final_reply,ai_draft&limit=500`) as Promise<any[]>])}const cm=new Map(comments.map(x=>[x.id,x]));const rm=new Map(replyRows.map(x=>[x.comment_id,x]));const recentActivity:AutoReplyActivity[]=activities.map(a=>{const c=cm.get(a.comment_id),r=rm.get(a.comment_id);return{id:a.id,commentId:a.comment_id,platform:c?.platform||"unknown",accountKey:c?.account_key||null,sourceType:c?source(c):"COMMENT",commentText:c?.comment_text||"",action:a.action||"",actor:a.actor||null,answer:r?.final_reply||r?.ai_draft||null,note:a.note||null,commentUrl:c?.comment_url||null,createdAt:a.created_at}});return{counts:{newComments,pendingApproval,aiDraftReady,repliedToday:replied,escalated,autoReplied:auto.length},pending,autoReplied:auto,recentActivity}}
+
+export async function getAutoReplyDashboardData():Promise<AutoReplyDashboardData>{
+ const [newComments,_pendingApproval,aiDraftReady,replied,escalated,pendingRows,activities,auto]=await Promise.all([
+  count("NEW"),
+  count("PENDING_APPROVAL"),
+  count("AI_DRAFTED"),
+  repliedToday(),
+  count("ESCALATED"),
+  autoReplySupabaseRequest(`/rest/v1/social_comments?status=in.(PENDING_APPROVAL,AI_DRAFTED)&select=*&order=created_at.desc&limit=500`) as Promise<any[]>,
+  autoReplySupabaseRequest(`/rest/v1/social_comment_activity?select=*&order=created_at.desc&limit=100`) as Promise<any[]>,
+  autoReplied()
+ ]);
+
+ const pr=await replies(pendingRows.map(x=>x.id));
+
+ // IMPORTANT:
+ // A direct auto-reply can transition from PENDING_APPROVAL -> AUTO_REPLIED
+ // while this dashboard request is running. Because the dashboard loads
+ // pending rows and sent replies concurrently, the same message could
+ // otherwise appear in both columns during that transition.
+ //
+ // sent_at is the source of truth: once a reply has actually been sent,
+ // never show that message in Need Approval even if the status snapshot
+ // was read milliseconds before it changed.
+ const pending=pendingRows
+  .map(x=>map(x,pr.get(x.id)))
+  .filter(x=>!x.reply?.sentAt);
+
+ const ids=Array.from(new Set(activities.map(x=>x.comment_id).filter(Boolean)));
+ let comments:any[]=[],replyRows:any[]=[];
+ if(ids.length){
+  const q=ids.map(id=>`"${id}"`).join(",");
+  [comments,replyRows]=await Promise.all([
+   autoReplySupabaseRequest(`/rest/v1/social_comments?id=in.(${encodeURIComponent(q)})&select=id,platform,account_key,platform_comment_id,platform_content_id,comment_url,comment_text&limit=500`) as Promise<any[]>,
+   autoReplySupabaseRequest(`/rest/v1/social_comment_replies?comment_id=in.(${encodeURIComponent(q)})&select=comment_id,final_reply,ai_draft&limit=500`) as Promise<any[]>
+  ])
+ }
+ const cm=new Map(comments.map(x=>[x.id,x]));
+ const rm=new Map(replyRows.map(x=>[x.comment_id,x]));
+ const recentActivity:AutoReplyActivity[]=activities.map(a=>{
+  const c=cm.get(a.comment_id),r=rm.get(a.comment_id);
+  return{id:a.id,commentId:a.comment_id,platform:c?.platform||"unknown",accountKey:c?.account_key||null,sourceType:c?source(c):"COMMENT",commentText:c?.comment_text||"",action:a.action||"",actor:a.actor||null,answer:r?.final_reply||r?.ai_draft||null,note:a.note||null,commentUrl:c?.comment_url||null,createdAt:a.created_at}
+ });
+
+ return{
+  counts:{
+   newComments,
+   pendingApproval:pending.length,
+   aiDraftReady,
+   repliedToday:replied,
+   escalated,
+   autoReplied:auto.length
+  },
+  pending,
+  autoReplied:auto,
+  recentActivity
+ }
+}
+
 export async function writeAutoReplyActivity(commentId:string,action:string,actor:string,note?:string|null){await autoReplySupabaseRequest("/rest/v1/social_comment_activity",{method:"POST",headers:{Prefer:"return=minimal"},body:JSON.stringify({comment_id:commentId,action,actor,note:note||null})})}
