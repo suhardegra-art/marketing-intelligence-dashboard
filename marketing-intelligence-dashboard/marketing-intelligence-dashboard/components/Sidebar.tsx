@@ -40,6 +40,7 @@ function itemHref(item: string) {
   if (item === "Instagram") return "/instagram";
   if (item === "TikTok") return "/tiktok";
   if (item === "TikTok Live") return "/tiktok-live";
+  if (item === "Facebook") return "/facebook";
   if (item === "YouTube") return "/youtube";
   if (item === "Auto Reply Comment") return "/auto-reply-comment";
   if (item === "Offline Overview") return "/offline-overview";
