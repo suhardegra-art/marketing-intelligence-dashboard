@@ -65,6 +65,7 @@ type LiveContext = {
   loadMore: () => Promise<void>;
   ensureLoaded: (minimum: number) => Promise<boolean>;
   loadAllForCsv: () => Promise<{ instagram: InstagramLiveRow[]; facebook: FacebookLiveRow[] }>;
+  refreshDashboard: () => void;
 };
 const Context = createContext<LiveContext | null>(null);
 const PAGE_SIZE = 50; // Meta API limit is 50; UI assembles two pages per 100 rows.
@@ -151,6 +152,8 @@ export function MetaLiveProvider({ platform, children }: { platform: MetaPlatfor
   const [coverage, setCoverage] = useState<MetaCoverage | null>(null);
   const [historyError, setHistoryError] = useState<string | null>(null);
   const [scannedCount, setScannedCount] = useState(0);
+  const [refreshVersion, setRefreshVersion] = useState(0);
+  const refreshDashboard = useCallback(() => setRefreshVersion((version) => version + 1), []);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -184,7 +187,7 @@ export function MetaLiveProvider({ platform, children }: { platform: MetaPlatfor
       if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : "Unable to load live analytics.");
     }).finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
-  }, [platform]);
+  }, [platform, refreshVersion]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -201,7 +204,7 @@ export function MetaLiveProvider({ platform, children }: { platform: MetaPlatfor
       if (!controller.signal.aborted) setHistoryError(cause instanceof Error ? cause.message : "History snapshots unavailable.");
     });
     return () => controller.abort();
-  }, [platform]);
+  }, [platform, refreshVersion]);
 
   const ensureLoaded = useCallback(async (minimum: number) => {
     if (loading || loadingMore) return false;
@@ -261,10 +264,10 @@ export function MetaLiveProvider({ platform, children }: { platform: MetaPlatfor
     platform, instagramRows, facebookRows, account, accountInsights, audience, page,
     history, allTimeTop, coverage, historyError, scannedCount,
     loading, loadingMore, error, hasNext: Boolean(cursor), updatedAt,
-    period, setPeriod, loadMore, ensureLoaded, loadAllForCsv
+    period, setPeriod, loadMore, ensureLoaded, loadAllForCsv, refreshDashboard
   }), [platform, instagramRows, facebookRows, account, accountInsights, audience, page,
     history, allTimeTop, coverage, historyError, scannedCount,
-    loading, loadingMore, error, cursor, updatedAt, period, setPeriod, loadMore, ensureLoaded, loadAllForCsv]);
+    loading, loadingMore, error, cursor, updatedAt, period, setPeriod, loadMore, ensureLoaded, loadAllForCsv, refreshDashboard]);
   return <Context.Provider value={value}>{children}</Context.Provider>;
 }
 export function useMetaLive(): LiveContext {

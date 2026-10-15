@@ -149,6 +149,8 @@ export default function MetaDashboardLive({ platform }: { platform: MetaPlatform
   const [exporting, setExporting] = useState(false);
   const [tablePage, setTablePage] = useState(1);
   const [csvError, setCsvError] = useState<string | null>(null);
+  const [syncingNow, setSyncingNow] = useState(false);
+  const [syncNotice, setSyncNotice] = useState<{ status: "ok" | "error"; text: string } | null>(null);
 
   const allRows = useMemo(() => toRows(platform, live.instagramRows, live.facebookRows),
     [platform, live.instagramRows, live.facebookRows]);
@@ -314,15 +316,81 @@ export default function MetaDashboardLive({ platform }: { platform: MetaPlatform
   const showPages = Array.from({ length: Math.min(7, pageCount + (live.hasNext ? 1 : 0)) }, (_, index) => index + Math.max(1, tablePage - 3))
     .filter((value) => value <= pageCount + (live.hasNext ? 1 : 0));
 
+  async function resyncNow() {
+    if (syncingNow || live.loading) return;
+    setSyncingNow(true);
+    setSyncNotice(null);
+    try {
+      const response = await fetch("/api/meta/manual-sync", {
+        method: "POST",
+        credentials: "same-origin",
+        cache: "no-store",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ platform })
+      });
+      const result = await response.json().catch(() => null) as {
+        ok?: boolean; partial?: boolean; posts?: number; pages?: number; error?: string;
+      } | null;
+      if (!response.ok || !result?.ok) {
+        throw new Error(result?.error || `Sync request failed (HTTP ${response.status}).`);
+      }
+      // The dashboard only reads Supabase. Re-query it after the server finishes writing.
+      live.refreshDashboard();
+      setSyncNotice({
+        status: "ok",
+        text: `Supabase updated: ${result.posts ?? 0} content records processed for ${platform}.${result.partial ? " Some optional metrics could not be retrieved." : ""} Historical backfill continues with future syncs.`
+      });
+    } catch (error) {
+      setSyncNotice({
+        status: "error",
+        text: error instanceof Error ? error.message : "Manual sync failed. Check Vercel Function Logs."
+      });
+    } finally {
+      setSyncingNow(false);
+    }
+  }
+
   return (
     <main className={`${p}-main`}>
       <header className={`${p}-topbar`}>
         <div><h1>{ig ? "Instagram" : "Facebook"} Performance</h1><p>Stored organic insights served from Supabase. Meta is accessed only during Vercel sync.</p></div>
-        <div className={`${p}-top-actions`}><div className={`${p}-status-pill`}>
-          <span>{live.loading ? "CONNECTING" : live.error ? "API ERROR" : "SUPABASE DATA"}</span>
-          <strong>{live.loading ? "Loading..." : live.error || `Last synced ${live.updatedAt ? live.updatedAt.toLocaleString("id-ID", { timeZone: "Asia/Jakarta" }) + " WIB" : "pending"}`}</strong>
-        </div><div className={`${p}-avatar`}>{ig ? "IG" : "f"}</div></div>
+        <div className={`${p}-top-actions`} style={{ flexWrap: "wrap", justifyContent: "flex-end" }}>
+          <button
+            type="button"
+            title={`Sync ${ig ? "Instagram" : "Facebook"} Insights to Supabase now`}
+            onClick={() => void resyncNow()}
+            disabled={syncingNow || live.loading}
+            aria-busy={syncingNow}
+            style={{
+              minHeight: 39, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 7,
+              padding: "0 14px", border: "none", borderRadius: 10,
+              color: "white", backgroundColor: theme, fontWeight: 800, fontSize: 11,
+              cursor: syncingNow || live.loading ? "wait" : "pointer",
+              opacity: syncingNow || live.loading ? 0.72 : 1,
+              boxShadow: "0 5px 13px rgba(40,48,96,.12)", whiteSpace: "nowrap"
+            }}
+          >
+            <span aria-hidden="true" style={{ fontSize: 17, lineHeight: 1 }}>↻</span>
+            {syncingNow ? "Syncing to Supabase…" : "Resync Now"}
+          </button>
+          <div className={`${p}-status-pill`}>
+            <span>{live.loading ? "CONNECTING" : live.error ? "API ERROR" : "SUPABASE DATA"}</span>
+            <strong>{live.loading ? "Loading..." : live.error || `Last synced ${live.updatedAt ? live.updatedAt.toLocaleString("id-ID", { timeZone: "Asia/Jakarta" }) + " WIB" : "pending"}`}</strong>
+          </div>
+          <div className={`${p}-avatar`}>{ig ? "IG" : "f"}</div>
+        </div>
       </header>
+      {syncNotice && (
+        <div
+          role={syncNotice.status === "error" ? "alert" : "status"}
+          style={{
+            marginBottom: 14, padding: "10px 14px", borderRadius: 10, fontSize: 12,
+            border: `1px solid ${syncNotice.status === "error" ? "#f3b7bd" : "#b6dccc"}`,
+            background: syncNotice.status === "error" ? "#fff4f4" : "#f1faf5",
+            color: syncNotice.status === "error" ? "#a12836" : "#187647"
+          }}
+        >{syncNotice.text}</div>
+      )}
       <section className={`${p}-banner`}>
         <div className={`${p}-banner-copy`}><p>{ig ? "INSTAGRAM PROFESSIONAL ACCOUNT" : "FACEBOOK BUSINESS PAGE"}</p>
           <h2>{title}</h2><span>{ig ? "@im.indomobil · " : ""}Organic Performance &amp; Content Intelligence</span></div>

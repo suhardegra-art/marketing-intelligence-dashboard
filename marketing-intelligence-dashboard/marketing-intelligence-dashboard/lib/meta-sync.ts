@@ -406,3 +406,8 @@ export async function runMetaBackfillSync(){
   for(const platform of ["instagram","facebook"] as const) results.push(await runOne(platform,"backfill"));
   return {ok:results.every(x=>x.ok),results};
 }
+
+/** Run the existing daily ingest for a single authenticated dashboard. */
+export async function runMetaManualSync(platform: MetaPlatform) {
+  return runOne(platform, "daily");
+}
