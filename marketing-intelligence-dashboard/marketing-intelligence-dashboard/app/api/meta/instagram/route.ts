@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { metaConfig, metaGraph, unixDate } from "@/lib/meta-graph";
+import { metaConfig, metaGraph, unixDate, publicMetaPaging } from "@/lib/meta-graph";
 
 export const dynamic = "force-dynamic";
 
@@ -167,9 +167,12 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       ok: true,
       account,
-      accountInsights,
+      accountInsights: {
+        data: Array.isArray(accountInsights?.data) ? accountInsights.data : [],
+        ...(accountInsights?.warning ? { warning: accountInsights.warning } : {})
+      },
       media: enriched,
-      paging: mediaPayload?.paging || null
+      paging: publicMetaPaging(mediaPayload?.paging)
     });
   } catch (error) {
     return NextResponse.json(

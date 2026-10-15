@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { metaConfig, metaGraph } from "@/lib/meta-graph";
+import { metaConfig, metaGraph, publicMetaPaging } from "@/lib/meta-graph";
 
 export const dynamic = "force-dynamic";
 
@@ -115,7 +115,7 @@ export async function GET(request: NextRequest) {
       ok: true,
       page,
       posts: enriched,
-      paging: postsPayload?.paging || null
+      paging: publicMetaPaging(postsPayload?.paging)
     });
   } catch (error) {
     return NextResponse.json(

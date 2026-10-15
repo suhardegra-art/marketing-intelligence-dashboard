@@ -89,3 +89,21 @@ export function unixDate(date: string | null | undefined) {
   const value = Math.floor(new Date(`${date}T00:00:00Z`).getTime() / 1000);
   return Number.isFinite(value) ? value : undefined;
 }
+
+/**
+ * Expose only pagination cursors, never Meta's raw paging.next/previous URLs.
+ * Graph API paging URLs can contain an access_token query parameter.
+ */
+export function publicMetaPaging(paging: any) {
+  if (!paging || typeof paging !== "object") return null;
+
+  const cursors = paging.cursors || {};
+  return {
+    cursors: {
+      before: typeof cursors.before === "string" ? cursors.before : null,
+      after: typeof cursors.after === "string" ? cursors.after : null
+    },
+    hasNext: Boolean(paging.next),
+    hasPrevious: Boolean(paging.previous)
+  };
+}
