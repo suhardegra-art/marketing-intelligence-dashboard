@@ -81,12 +81,30 @@ async function mediaInsights(media: Media) {
   }
 }
 
+
+// Avoid bursts of dozens of simultaneous Insights requests to Meta.
+async function mapConcurrent<T, U>(items: T[], max: number, mapper: (item: T) => Promise<U>): Promise<U[]> {
+  const result: U[] = new Array(items.length);
+  let cursor = 0;
+  await Promise.all(Array.from({ length: Math.min(max, items.length) }, async () => {
+    while (cursor < items.length) {
+      const index = cursor++;
+      result[index] = await mapper(items[index]);
+    }
+  }));
+  return result;
+}
+
 export async function GET(request: NextRequest) {
   try {
     const { instagramUserId } = metaConfig();
 
+    const after = request.nextUrl.searchParams.get("after");
     const from = request.nextUrl.searchParams.get("from");
     const to = request.nextUrl.searchParams.get("to");
+    if (after && (after.length > 2048 || /[\x00-\x20]/.test(after))) {
+      return NextResponse.json({ ok: false, error: "Invalid pagination cursor." }, { status: 400 });
+    }
     const limit = Math.min(
       50,
       Math.max(
@@ -108,7 +126,8 @@ export async function GET(request: NextRequest) {
       {
         fields:
           "id,caption,media_type,media_product_type,permalink,timestamp,like_count,comments_count,thumbnail_url",
-        limit
+        limit,
+        after: after || undefined
       }
     );
 
@@ -133,12 +152,10 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    const enriched = await Promise.all(
-      media.map(async (item) => ({
+    const enriched = await mapConcurrent(media, 5, async (item) => ({
         ...item,
         insights: await mediaInsights(item)
-      }))
-    );
+      }));
 
     let accountInsights: any = null;
 

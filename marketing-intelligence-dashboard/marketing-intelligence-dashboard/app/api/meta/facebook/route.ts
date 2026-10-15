@@ -58,12 +58,30 @@ async function postInsights(postId: string) {
   }
 }
 
+
+// Avoid bursts of dozens of simultaneous Insights requests to Meta.
+async function mapConcurrent<T, U>(items: T[], max: number, mapper: (item: T) => Promise<U>): Promise<U[]> {
+  const result: U[] = new Array(items.length);
+  let cursor = 0;
+  await Promise.all(Array.from({ length: Math.min(max, items.length) }, async () => {
+    while (cursor < items.length) {
+      const index = cursor++;
+      result[index] = await mapper(items[index]);
+    }
+  }));
+  return result;
+}
+
 export async function GET(request: NextRequest) {
   try {
     const { facebookPageId } = metaConfig();
 
+    const after = request.nextUrl.searchParams.get("after");
     const from = request.nextUrl.searchParams.get("from");
     const to = request.nextUrl.searchParams.get("to");
+    if (after && (after.length > 2048 || /[\x00-\x20]/.test(after))) {
+      return NextResponse.json({ ok: false, error: "Invalid pagination cursor." }, { status: 400 });
+    }
     const limit = Math.min(
       50,
       Math.max(
@@ -89,7 +107,8 @@ export async function GET(request: NextRequest) {
           "id,message,created_time,permalink_url,shares,comments.limit(0).summary(true),reactions.limit(0).summary(true)",
         since: from || undefined,
         until: to || undefined,
-        limit
+        limit,
+        after: after || undefined
       },
       {},
       "facebook"
@@ -99,8 +118,7 @@ export async function GET(request: NextRequest) {
       ? postsPayload.data
       : [];
 
-    const enriched = await Promise.all(
-      posts.map(async (post) => ({
+    const enriched = await mapConcurrent(posts, 5, async (post) => ({
         ...post,
         reactions:
           post.reactions?.summary?.total_count ?? 0,
@@ -108,8 +126,7 @@ export async function GET(request: NextRequest) {
           post.comments?.summary?.total_count ?? 0,
         shares: post.shares?.count ?? 0,
         insights: await postInsights(post.id)
-      }))
-    );
+      }));
 
     return NextResponse.json({
       ok: true,
