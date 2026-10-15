@@ -1,91 +1,25 @@
 import { NextResponse } from "next/server";
-import { metaConfig, metaGraph } from "@/lib/meta-graph";
-
-export const dynamic = "force-dynamic";
-
-function failureMessage(result: PromiseRejectedResult): string {
-  return result.reason instanceof Error
-    ? result.reason.message
-    : "Unable to verify Meta connection.";
-}
-
-export async function GET() {
-  try {
-    const { facebookPageId, instagramUserId, version } = metaConfig();
-
-    // Independent requests: a Facebook token issue should not hide the
-    // working Instagram connection in the status endpoint.
-    const [facebookResult, instagramResult] = await Promise.allSettled([
-      metaGraph<any>(
-        `/${facebookPageId}`,
-        {
-          fields:
-            "id,name,link,fan_count,followers_count,instagram_business_account{id,username}"
-        },
-        {},
-        "facebook"
-      ),
-      metaGraph<any>(
-        `/${instagramUserId}`,
-        {
-          fields:
-            "id,username,name,followers_count,media_count,profile_picture_url"
-        },
-        {},
-        "instagram"
-      )
+import { metaConfig } from "@/lib/meta-graph";
+import { readMetaProfile, metaRows, type MetaIngestCursor } from "@/lib/meta-store";
+export const dynamic="force-dynamic";
+export const runtime="nodejs";
+// Supabase status: "connected" means STORED DATA exists, not Graph-token validity.
+export async function GET(){
+  try{
+    const {version,instagramUserId,facebookPageId}=metaConfig();
+    const [instagram,facebook,igEdges,fbEdges]=await Promise.all([
+      readMetaProfile("instagram",instagramUserId),readMetaProfile("facebook",facebookPageId),
+      metaRows<MetaIngestCursor>(`meta_ingest_cursors?platform=eq.instagram&account_id=eq.${encodeURIComponent(instagramUserId)}&select=*`),
+      metaRows<MetaIngestCursor>(`meta_ingest_cursors?platform=eq.facebook&account_id=eq.${encodeURIComponent(facebookPageId)}&select=*`)
     ]);
-
-    const facebook = facebookResult.status === "fulfilled"
-      ? {
-          connected: true,
-          id: facebookResult.value.id,
-          name: facebookResult.value.name,
-          link: facebookResult.value.link || null,
-          followers:
-            facebookResult.value.followers_count ??
-            facebookResult.value.fan_count ??
-            null,
-          linkedInstagram:
-            facebookResult.value.instagram_business_account || null
-        }
-      : {
-          connected: false,
-          error: failureMessage(facebookResult)
-        };
-
-    const instagram = instagramResult.status === "fulfilled"
-      ? {
-          connected: true,
-          id: instagramResult.value.id,
-          username: instagramResult.value.username,
-          name: instagramResult.value.name || null,
-          followers: instagramResult.value.followers_count ?? null,
-          mediaCount: instagramResult.value.media_count ?? null,
-          profilePictureUrl:
-            instagramResult.value.profile_picture_url || null
-        }
-      : {
-          connected: false,
-          error: failureMessage(instagramResult)
-        };
-
-    return NextResponse.json({
-      ok: facebook.connected && instagram.connected,
-      graphVersion: version,
-      facebook,
-      instagram
-    });
-  } catch (error) {
-    return NextResponse.json(
-      {
-        ok: false,
-        error:
-          error instanceof Error
-            ? error.message
-            : "Unable to verify Meta connection."
-      },
-      { status: 500 }
-    );
-  }
+    const allComplete=(edges:MetaIngestCursor[],expected:string[])=>expected.every(edge=>edges.find(r=>r.edge===edge)?.initial_complete);
+    return NextResponse.json({ok:Boolean(instagram&&facebook),source:"supabase",graphVersion:version,
+      instagram:{connected:Boolean(instagram),id:instagramUserId,username:instagram?.username||null,
+        followers:instagram?.followers??null,lastSyncedAt:instagram?.captured_at||null,historyComplete:allComplete(igEdges,["media"])},
+      facebook:{connected:Boolean(facebook),id:facebookPageId,name:facebook?.name||null,
+        followers:facebook?.followers??null,lastSyncedAt:facebook?.captured_at||null,historyComplete:allComplete(fbEdges,["posts","videos","photos"])}},
+      {headers:{"Cache-Control":"private, no-store"}});
+  }catch(error){return NextResponse.json({ok:false,source:"supabase",
+    error:error instanceof Error?error.message:"DB sync not configured"},
+    {status:503,headers:{"Cache-Control":"private, no-store"}});}
 }

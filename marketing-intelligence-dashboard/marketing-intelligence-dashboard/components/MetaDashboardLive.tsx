@@ -106,6 +106,7 @@ function demographicRows(records: Array<Record<string, any>> | undefined) {
   const result: Array<{ name: string; value: number; share: number }> = [];
   if (!records) return result;
   for (const metric of records) {
+    // Instagram Insights: total_value.breakdowns[].results[].dimension_values
     const breakdowns = metric?.total_value?.breakdowns;
     for (const breakdown of Array.isArray(breakdowns) ? breakdowns : []) {
       for (const row of Array.isArray(breakdown?.results) ? breakdown.results : []) {
@@ -113,10 +114,20 @@ function demographicRows(records: Array<Record<string, any>> | undefined) {
         if (name && typeof row.value === "number") result.push({ name, value: row.value, share: 0 });
       }
     }
+    // Facebook Page Insights: values[].value is a map keyed by country/city/age.
+    const values = Array.isArray(metric?.values) ? metric.values : [];
+    const latest = values.length ? values[values.length - 1]?.value : null;
+    if (latest && typeof latest === "object" && !Array.isArray(latest)) {
+      for (const [name, value] of Object.entries(latest)) {
+        if (typeof value === "number") result.push({ name, value, share: 0 });
+      }
+    }
   }
-  const total = result.reduce((sum, row) => sum + row.value, 0);
-  return result.sort((a, b) => b.value - a.value).slice(0, 10)
-    .map((row) => ({ ...row, share: total > 0 ? row.value / total * 100 : 0 }));
+  const combined = new Map<string, number>();
+  result.forEach(row => combined.set(row.name, (combined.get(row.name) || 0) + row.value));
+  const total = [...combined.values()].reduce((a,b) => a+b, 0);
+  return [...combined.entries()].map(([name,value]) => ({name,value,share:total>0?value/total*100:0}))
+    .sort((a,b) => b.value-a.value).slice(0,10);
 }
 
 export default function MetaDashboardLive({ platform }: { platform: MetaPlatform }) {
@@ -184,7 +195,8 @@ export default function MetaDashboardLive({ platform }: { platform: MetaPlatform
     return [...dedup.values()].filter((row) => row.views != null)
       .sort((a, b) => (b.views ?? 0) - (a.views ?? 0)).slice(0, 5);
   }, [live.allTimeTop, allRows]);
-  const historyComplete = Boolean(live.coverage?.complete || (!live.loading && !live.hasNext && !live.error));
+  // Finishing all rows currently STORED in Supabase does not imply Graph backfill complete.
+  const historyComplete = Boolean(live.coverage?.complete);
 
   const snapshots = live.history.filter((row) => row.snapshot_date >= cutoff(growthWindow));
   const followerPoints = snapshotPoints(snapshots, "followers");
@@ -205,8 +217,8 @@ export default function MetaDashboardLive({ platform }: { platform: MetaPlatform
       : !live.history.length ? "First historical snapshot will be saved at the next successful 08:00 WIB sync."
         : `Stored daily snapshots: ${live.history.length}. Last snapshot: ${live.history[live.history.length - 1].snapshot_date} (WIB).`;
 
-  const typeNames = ig ? ["Reel", "Post", "Carousel"] : ["Reel", "Video", "Photo", "Link", "Post"];
-  const palette = ig ? ["#6d5cf5", "#d14fba", "#f59c55"] : ["#1877f2", "#59a4ff", "#8bc2ff", "#b7d9ff", "#c4a8ef"];
+  const typeNames = ig ? ["Reel", "Post", "Carousel", "Story"] : ["Reel", "Video", "Photo", "Link", "Post"];
+  const palette = ig ? ["#6d5cf5", "#d14fba", "#f59c55", "#a48aff"] : ["#1877f2", "#59a4ff", "#8bc2ff", "#b7d9ff", "#c4a8ef"];
   const formatGroups = typeNames.map((type) => ({
     label: type,
     count: filtered.filter((row) => row.type === type).length,
@@ -229,9 +241,11 @@ export default function MetaDashboardLive({ platform }: { platform: MetaPlatform
   const weekdayCounts = weekdayNames.map((name, day) => ({
     name, value: filtered.filter((row) => row.date && new Date(`${row.date}T00:00:00Z`).getUTCDay() === day).length
   }));
-  const demographics = ig ? demographicRows(live.audience?.[audienceTab === "demographic" ? "age" : audienceTab === "cities" ? "city" : "country"]) : [];
+  const audienceField = (tab: AudienceTab) => tab === "demographic" ? (ig ? "age" : "gender_age")
+    : tab === "cities" ? "city" : "country";
+  const demographics = demographicRows(live.audience?.[audienceField(audienceTab)]);
   const genderRows = ig && audienceTab === "demographic" ? demographicRows(live.audience?.gender) : [];
-  const hasRealDemo = ig && (demographics.length > 0 || genderRows.length > 0);
+  const hasRealDemo = demographics.length > 0 || genderRows.length > 0;
 
   const dateDescription = from || to ? `${from || "Start"} – ${to || "Latest"}` : "All loaded publish dates";
   const disabled = live.loading || live.loadingMore || exporting;
@@ -291,7 +305,7 @@ export default function MetaDashboardLive({ platform }: { platform: MetaPlatform
     if (disabled) return;
     setCsvError(null);
     try { await live.loadAllForCsv(); }
-    catch (cause) { setCsvError(cause instanceof Error ? cause.message : "Unable to scan historical posts."); }
+    catch (cause) { setCsvError(cause instanceof Error ? cause.message : "Unable to load all stored posts."); }
   }
   const pageCount = Math.max(1, Math.ceil(filtered.length / PER_PAGE));
   const canNext = tablePage < pageCount || live.hasNext;
@@ -303,10 +317,10 @@ export default function MetaDashboardLive({ platform }: { platform: MetaPlatform
   return (
     <main className={`${p}-main`}>
       <header className={`${p}-topbar`}>
-        <div><h1>{ig ? "Instagram" : "Facebook"} Performance</h1><p>Live organic content analytics from Meta Graph API.</p></div>
+        <div><h1>{ig ? "Instagram" : "Facebook"} Performance</h1><p>Stored organic insights served from Supabase. Meta is accessed only during Vercel sync.</p></div>
         <div className={`${p}-top-actions`}><div className={`${p}-status-pill`}>
-          <span>{live.loading ? "CONNECTING" : live.error ? "API ERROR" : "LIVE META API"}</span>
-          <strong>{live.loading ? "Loading..." : live.error || `Updated ${live.updatedAt?.toLocaleTimeString() || "now"}`}</strong>
+          <span>{live.loading ? "CONNECTING" : live.error ? "API ERROR" : "SUPABASE DATA"}</span>
+          <strong>{live.loading ? "Loading..." : live.error || `Last synced ${live.updatedAt ? live.updatedAt.toLocaleString("id-ID", { timeZone: "Asia/Jakarta" }) + " WIB" : "pending"}`}</strong>
         </div><div className={`${p}-avatar`}>{ig ? "IG" : "f"}</div></div>
       </header>
       <section className={`${p}-banner`}>
@@ -364,8 +378,8 @@ export default function MetaDashboardLive({ platform }: { platform: MetaPlatform
 
       <section className={`${p}-two-column`}>
         <article className={`${p}-panel`}>
-          <div className={`${p}-section-head`}><div><h2>{hasRealDemo ? "Audience" : "Content & Engagement"}</h2><p>{hasRealDemo ? "Actual Instagram follower demographics (last 90 days)." : "Observed content data instead of unavailable audience demographics."}</p></div></div>
-          <div className={`${p}-audience-tabs`}>{(["demographic", "cities", "countries"] as AudienceTab[]).map((key) => <button key={key} type="button" className={audienceTab === key ? "active" : ""} onClick={() => setAudienceTab(key)}>{ig && demographicRows(live.audience?.[key === "demographic" ? "age" : key === "cities" ? "city" : "country"]).length ?
+          <div className={`${p}-section-head`}><div><h2>{hasRealDemo ? "Audience" : "Content & Engagement"}</h2><p>{hasRealDemo ? "Stored audience demographics returned by Meta, when supported." : "Observed content data instead of unavailable audience demographics."}</p></div></div>
+          <div className={`${p}-audience-tabs`}>{(["demographic", "cities", "countries"] as AudienceTab[]).map((key) => <button key={key} type="button" className={audienceTab === key ? "active" : ""} onClick={() => setAudienceTab(key)}>{demographicRows(live.audience?.[audienceField(key)]).length ?
             (key === "demographic" ? "Age & Gender" : key === "cities" ? "Top Cities" : "Top Countries") :
             (key === "demographic" ? "Format Mix" : key === "cities" ? "Interactions" : "Posting Days")}</button>)}</div>
           {hasRealDemo ? <div>
@@ -398,7 +412,7 @@ export default function MetaDashboardLive({ platform }: { platform: MetaPlatform
               <i className={`c${Math.min(index + 1, 4)}`} style={{ background: palette[index] }} /><span>{row.label}</span>
               <strong>{percent(row.views, totalViewsByType)}</strong></div>)}</div></div>
           <div className={`${p}-reach-mix`}><h3>Coverage</h3><p style={{ color: "#8b93a7", fontSize: 11 }}>
-            Loaded {allRows.length} posts. {live.coverage ? `${live.coverage.scanned} historical posts stored in Supabase.` : "Historical catalog not connected."}
+            Loaded {allRows.length} posts. {live.coverage ? `${live.coverage.scanned} historical posts stored in Supabase. Remote backfill: ${live.coverage.complete ? "complete for supported sources" : "in progress"}.` : "Stored historical catalog not connected."}
           </p></div>
         </article>
       </section>
@@ -426,11 +440,11 @@ export default function MetaDashboardLive({ platform }: { platform: MetaPlatform
 
       <section className={`${p}-panel`}>
         <div className={`${p}-section-head`}><div><h2>Top Content — All-Time Views</h2><p>
-          {historyComplete ? "Top five posts by reported views across scanned historical media." :
-            `Full-history scan in progress. ${Math.max(live.coverage?.scanned ?? 0, live.scannedCount)} posts currently indexed or loaded; ranking is provisional.`}
+          {historyComplete ? "Top five stored posts by reported views; Meta historical coverage is complete." :
+            `Meta-to-Supabase historical ingestion is in progress. ${Math.max(live.coverage?.scanned ?? 0, live.scannedCount)} posts currently indexed or loaded; ranking is provisional.`}
         </p></div>
           {!historyComplete && <button type="button" className={`${p}-download`} onClick={() => void scanHistory()} disabled={disabled}>
-            {live.loadingMore ? `Scanning ${live.scannedCount} posts…` : "Scan All History Now"}
+            {live.loadingMore ? `Loading ${live.scannedCount} stored posts…` : "Load All Stored Content"}
           </button>}
         </div>
         {(live.error || csvError) && <p role="alert" style={{ fontSize: 11, color: "#bd2b45" }}>{live.error || csvError}</p>}
@@ -447,7 +461,7 @@ export default function MetaDashboardLive({ platform }: { platform: MetaPlatform
 
       <section className={`${p}-panel`}>
         <div className={`${p}-section-head`}><div><h2>{ig ? "Instagram" : "Facebook"} Content</h2>
-          <p>{filtered.length} matching of {allRows.length} loaded posts • 100 rows/page • {live.hasNext ? "Older content available" : "Accessible history loaded"}</p></div>
+          <p>{filtered.length} matching of {allRows.length} loaded posts • 100 rows/page • {live.hasNext ? "More saved content available" : "All currently stored content loaded"}</p></div>
           <div style={{ position: "relative" }}>
             <button type="button" className={`${p}-download`} disabled={disabled} onClick={() => setCsvMenu((open) => !open)}>{exporting ? "Exporting..." : "↓ Download CSV ▾"}</button>
             {csvMenu && <div role="menu" style={{ position: "absolute", right: 0, top: "calc(100% + 8px)", zIndex: 20, minWidth: 240, background: "#fff", border: "1px solid #e1e6ef", borderRadius: 12, boxShadow: "0 8px 26px #21315a33", padding: 8 }}>
@@ -478,9 +492,9 @@ export default function MetaDashboardLive({ platform }: { platform: MetaPlatform
               style={{ padding: "9px 13px", borderRadius: 24, border: "1px solid #d9e0ee", background: "white", cursor: "pointer" }}>›</button>
           </div>
         </div>
-        {live.loadingMore && <p style={{ color: "#8791a7", fontSize: 11 }}>Loading more historical Meta posts… {live.scannedCount} records scanned.</p>}
+        {live.loadingMore && <p style={{ color: "#8791a7", fontSize: 11 }}>Loading more stored Supabase posts… {live.scannedCount} records scanned.</p>}
       </section>
-      <footer className={`${p}-footer`}>{ig ? "Instagram" : "Facebook"} Analytics Dashboard • Live Meta API • Historical snapshots captured daily at scheduled 08:00 WIB once database migration and cron are active.</footer>
+      <footer className={`${p}-footer`}>{ig ? "Instagram" : "Facebook"} Analytics Dashboard • Supabase-first data • Daily sync at 08:00 WIB, background historical backfill every hour.</footer>
     </main>
   );
 }

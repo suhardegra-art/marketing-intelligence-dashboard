@@ -5,7 +5,7 @@ import type { ReactNode } from "react";
 
 export type MetaPlatform = "instagram" | "facebook";
 export type InstagramLiveRow = {
-  id: string; date: string; caption: string; type: "Reel" | "Post" | "Carousel";
+  id: string; date: string; caption: string; type: "Reel" | "Post" | "Carousel" | "Story";
   views: number | null; reach: number | null; likes: number | null;
   comments: number | null; shares: number | null; saves: number | null;
   permalink: string | null;
@@ -47,6 +47,7 @@ type ApiResult = {
   audience?: InstagramAudience;
   page?: LiveAccount; media?: Array<Record<string, any>>; posts?: Array<Record<string, any>>;
   paging?: { cursors?: { after?: string | null }; hasNext?: boolean } | null;
+  syncedAt?: string | null; source?: "supabase";
 };
 
 type LiveContext = {
@@ -89,7 +90,7 @@ function instagramItems(input: ApiResult["media"]): InstagramLiveRow[] {
     return {
       id: String(row.id), date: dateInWib(row.timestamp),
       caption: String(row.caption || "(No caption)"),
-      type: row.media_product_type === "REELS" ? "Reel"
+      type: row.media_product_type === "STORY" ? "Story" : row.media_product_type === "REELS" ? "Reel"
         : row.media_type === "CAROUSEL_ALBUM" ? "Carousel" : "Post",
       views: numberOrNull(metrics.views), reach: numberOrNull(metrics.reach),
       likes: numberOrNull(metrics.likes ?? row.like_count),
@@ -110,7 +111,8 @@ function facebookItems(input: ApiResult["posts"]): FacebookLiveRow[] {
     return {
       id: String(row.id), date: dateInWib(row.created_time),
       title: String(row.message || "(No caption)"),
-      type: link.includes("/reel/") ? "Reel" : link.includes("/videos/") ? "Video" : "Post",
+      type: (["Reel", "Video", "Photo", "Link", "Post"].includes(String(row.content_type))
+        ? String(row.content_type) : link.includes("/reel/") ? "Reel" : link.includes("/videos/") ? "Video" : "Post") as FacebookLiveRow["type"],
       reach: numberOrNull(row.insights?.uniqueViewers),
       impressions: numberOrNull(row.insights?.mediaViews),
       reactions: numberOrNull(row.reactions) ?? breakdownTotal,
@@ -177,7 +179,7 @@ export function MetaLiveProvider({ platform, children }: { platform: MetaPlatfor
       setAccount(first.account || null); setAccountInsights(first.accountInsights || null);
       setAudience(first.audience || null); setPage(first.page || null);
       setCursor(next); setScannedCount(platform === "instagram" ? ig.length : fb.length);
-      setUpdatedAt(new Date());
+      setUpdatedAt(first.syncedAt ? new Date(first.syncedAt) : null);
     })().catch((cause) => {
       if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : "Unable to load live analytics.");
     }).finally(() => { if (!controller.signal.aborted) setLoading(false); });
@@ -218,7 +220,7 @@ export function MetaLiveProvider({ platform, children }: { platform: MetaPlatfor
       }
       setInstagramRows(ig); setFacebookRows(fb); setCursor(next);
       setScannedCount(platform === "instagram" ? ig.length : fb.length);
-      setUpdatedAt(new Date());
+      // Account sync time is fixed until Vercel performs another Supabase ingestion.
       const finalCount = platform === "instagram" ? ig.length : fb.length;
       return finalCount >= minimum || finalCount > initialCount;
     } catch (cause) {
@@ -237,17 +239,16 @@ export function MetaLiveProvider({ platform, children }: { platform: MetaPlatfor
     let next = cursor; let pages = 0;
     try {
       while (next) {
-        if (++pages > MAX_EXPORT_PAGES) throw new Error("Meta cursor limit reached; export cancelled to avoid an incomplete file.");
+        if (++pages > MAX_EXPORT_PAGES) throw new Error("Stored database pagination limit reached; export cancelled to avoid an incomplete file.");
         const response = await fetchPage(platform, next);
         ig = uniqueById([...ig, ...instagramItems(response.media)]);
         fb = uniqueById([...fb, ...facebookItems(response.posts)]);
         const following = readCursor(response);
-        if (following === next) throw new Error("Meta returned the same pagination cursor.");
+        if (following === next) throw new Error("Supabase returned the same pagination cursor.");
         next = following;
         setScannedCount(platform === "instagram" ? ig.length : fb.length);
       }
       setInstagramRows(ig); setFacebookRows(fb); setCursor(null);
-      setUpdatedAt(new Date());
       return { instagram: ig, facebook: fb };
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : "Historical scan failed.";
