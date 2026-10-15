@@ -1,5 +1,7 @@
 type MetaParams = Record<string, string | number | boolean | undefined | null>;
 
+export type MetaService = "instagram" | "facebook";
+
 function required(name: string) {
   const value = process.env[name]?.trim();
 
@@ -13,18 +15,34 @@ function required(name: string) {
 export function metaConfig() {
   return {
     version: process.env.META_GRAPH_VERSION?.trim() || "v26.0",
-    pageAccessToken: required("META_PAGE_ACCESS_TOKEN"),
     facebookPageId: required("META_FACEBOOK_PAGE_ID"),
     instagramUserId: required("META_INSTAGRAM_USER_ID")
   };
 }
 
+function accessTokenFor(service: MetaService) {
+  if (service === "facebook") {
+    // Facebook Page posts and insights must use the actual Page Access Token.
+    // Do not silently fall back to the Instagram token.
+    return required("META_FACEBOOK_PAGE_ACCESS_TOKEN");
+  }
+
+  // The existing, working Instagram connection remains functional during
+  // migration. The new variable takes precedence after it is configured.
+  return (
+    process.env.META_INSTAGRAM_ACCESS_TOKEN?.trim() ||
+    required("META_PAGE_ACCESS_TOKEN")
+  );
+}
+
 export async function metaGraph<T>(
   path: string,
   params: MetaParams = {},
-  init: RequestInit = {}
+  init: RequestInit = {},
+  service: MetaService = "instagram"
 ): Promise<T> {
-  const { version, pageAccessToken } = metaConfig();
+  const { version } = metaConfig();
+  const accessToken = accessTokenFor(service);
 
   const normalizedPath = path.startsWith("/") ? path : `/${path}`;
   const url = new URL(
@@ -36,7 +54,7 @@ export async function metaGraph<T>(
     url.searchParams.set(key, String(value));
   });
 
-  url.searchParams.set("access_token", pageAccessToken);
+  url.searchParams.set("access_token", accessToken);
 
   const response = await fetch(url, {
     ...init,
@@ -59,7 +77,8 @@ export async function metaGraph<T>(
       payload?.error?.message ||
       `Meta Graph API HTTP ${response.status}`;
 
-    throw new Error(message);
+    // Keep secrets out of errors returned from server-side API routes.
+    throw new Error(String(message).replaceAll(accessToken, "[REDACTED]"));
   }
 
   return payload as T;

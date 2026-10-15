@@ -34,7 +34,9 @@ async function postInsights(postId: string) {
       {
         metric:
           "post_media_view,post_clicks,post_reactions_by_type_total"
-      }
+      },
+      {},
+      "facebook"
     );
 
     return {
@@ -75,7 +77,9 @@ export async function GET(request: NextRequest) {
       {
         fields:
           "id,name,link,fan_count,followers_count,picture.type(large)"
-      }
+      },
+      {},
+      "facebook"
     );
 
     const postsPayload = await metaGraph<any>(
@@ -86,7 +90,9 @@ export async function GET(request: NextRequest) {
         since: from || undefined,
         until: to || undefined,
         limit
-      }
+      },
+      {},
+      "facebook"
     );
 
     const posts: FacebookPost[] = Array.isArray(postsPayload?.data)
