@@ -39,8 +39,22 @@ async function postInsights(postId: string) {
       "facebook"
     );
 
+    // Unique Media Viewers replaces the deprecated Facebook reach metric.
+    // Query separately so an unsupported metric cannot break media views/clicks.
+    let uniqueViewers: number | null = null;
+    try {
+      const viewersPayload = await metaGraph<any>(
+        `/${postId}/insights`,
+        { metric: "post_total_media_view_unique" },
+        {},
+        "facebook"
+      );
+      uniqueViewers = insightValue(viewersPayload, "post_total_media_view_unique");
+    } catch { /* Unsupported/permission-limited; preserve other metrics. */ }
+
     return {
       mediaViews: insightValue(payload, "post_media_view"),
+      uniqueViewers,
       clicks: insightValue(payload, "post_clicks"),
       reactionsByType:
         insightValue(payload, "post_reactions_by_type_total")
@@ -48,6 +62,7 @@ async function postInsights(postId: string) {
   } catch (error) {
     return {
       mediaViews: null,
+      uniqueViewers: null,
       clicks: null,
       reactionsByType: null,
       insightError:

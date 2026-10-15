@@ -181,9 +181,28 @@ export async function GET(request: NextRequest) {
       };
     }
 
+    // Demographics are optional and may be unavailable despite 100+ followers.
+    // Request only on the first cursor page; Meta requires a lifetime period
+    // with timeframe for follower_demographics.
+    const audience: Record<string, any> = {};
+    if (!after) {
+      await Promise.all(["age", "gender", "city", "country"].map(async (breakdown) => {
+        try {
+          const result = await metaGraph<any>(
+            `/${instagramUserId}/insights`,
+            { metric: "follower_demographics", period: "lifetime", metric_type: "total_value", timeframe: "last_90_days", breakdown }
+          );
+          audience[breakdown] = result?.data ?? [];
+        } catch {
+          audience[breakdown] = [];
+        }
+      }));
+    }
+
     return NextResponse.json({
       ok: true,
       account,
+      audience,
       accountInsights: {
         data: Array.isArray(accountInsights?.data) ? accountInsights.data : [],
         ...(accountInsights?.warning ? { warning: accountInsights.warning } : {})
