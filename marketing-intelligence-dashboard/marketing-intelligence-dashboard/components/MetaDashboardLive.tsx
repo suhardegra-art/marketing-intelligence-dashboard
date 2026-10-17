@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import InstagramAIAnalysis from "@/components/InstagramAIAnalysis";
 import {
   useMetaLive, formatLiveCompact, formatLiveNumber, formatLiveEr, sumReported,
   type MetaPlatform, type InstagramLiveRow, type FacebookLiveRow, type MetaSnapshot,
@@ -492,6 +493,28 @@ export default function MetaDashboardLive({ platform }: { platform: MetaPlatform
         <div className={`${p}-main-chart trend`}>{chart(chartContent, theme, activeContentMetric)}</div>
       </section>
 
+      {ig ? (
+        <InstagramAIAnalysis
+          content={filtered}
+          period={contentWindow}
+          filterFrom={from}
+          filterTo={to}
+          accountName={title}
+          username={live.account?.username || "im.indomobil"}
+          currentFollowers={typeof currentFollowers === "number" ? currentFollowers : null}
+          snapshots={live.history}
+          syncedAt={live.updatedAt?.toISOString() ?? null}
+          hasMoreStored={live.hasNext}
+          remoteBackfillComplete={historyComplete}
+          loading={live.loading || live.loadingMore}
+          onLoadAllStored={async () => {
+            const fetched = await live.loadAllForCsv();
+            return toRows("instagram", fetched.instagram, fetched.facebook).filter(
+              (row) => (!from || row.date >= from) && (!to || row.date <= to)
+            );
+          }}
+        />
+      ) : (
       <section className={`${p}-panel ${p}-ai-card`}>
         <div className={`${p}-section-head`}><div><p className={`${p}-ai-label`}>CONTENT INTELLIGENCE</p><h2>Measured Content Summary</h2><p>Real calculations from loaded Meta data; AI-generated narratives are not enabled yet.</p></div></div>
         <div className={`${p}-ai-kpis`}>
@@ -505,6 +528,7 @@ export default function MetaDashboardLive({ platform }: { platform: MetaPlatform
           <article className="attention"><h3>Historical Data</h3><ul><li>{historyNote}</li></ul></article>
         </div>
       </section>
+      )}
 
       <section className={`${p}-panel`}>
         <div className={`${p}-section-head`}><div><h2>Top Content — All-Time Views</h2><p>
