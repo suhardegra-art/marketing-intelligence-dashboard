@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import InstagramAIAnalysis from "@/components/InstagramAIAnalysis";
+import FacebookAIAnalysis from "@/components/FacebookAIAnalysis";
 import {
   useMetaLive, formatLiveCompact, formatLiveNumber, formatLiveEr, sumReported,
   type MetaPlatform, type InstagramLiveRow, type FacebookLiveRow, type MetaSnapshot,
@@ -515,19 +516,26 @@ export default function MetaDashboardLive({ platform }: { platform: MetaPlatform
           }}
         />
       ) : (
-      <section className={`${p}-panel ${p}-ai-card`}>
-        <div className={`${p}-section-head`}><div><p className={`${p}-ai-label`}>CONTENT INTELLIGENCE</p><h2>Measured Content Summary</h2><p>Real calculations from loaded Meta data; AI-generated narratives are not enabled yet.</p></div></div>
-        <div className={`${p}-ai-kpis`}>
-          <div><span>LOADED POSTS</span><strong>{filtered.length}</strong></div>
-          <div><span>MEDIA VIEWS</span><strong>{formatLiveCompact(views)}</strong></div>
-          <div><span>INTERACTIONS</span><strong>{formatLiveCompact(interactions)}</strong></div>
-          <div><span>INTERACTION RATE</span><strong>{engagementRate}</strong></div>
-        </div>
-        <div className={`${p}-ai-preview`}><div><span>DATA QUALITY</span><p>Unavailable metrics are not zero. Facebook Unique Media Viewers is an alternative to legacy reach, but is not the same metric. View trends are grouped by publication date, not daily impressions. All-time Top Content is marked complete only once all accessible pages have been scanned.</p></div>
-          <article className="working"><h3>Highest Observed Views</h3><ul><li>{allTimeTop[0]?.caption || "No posts with reported views yet."}</li></ul></article>
-          <article className="attention"><h3>Historical Data</h3><ul><li>{historyNote}</li></ul></article>
-        </div>
-      </section>
+        <FacebookAIAnalysis
+          content={filtered}
+          period={contentWindow}
+          filterFrom={from}
+          filterTo={to}
+          accountName={title}
+          accountId={live.page?.id || "559714640555920"}
+          currentFollowers={typeof currentFollowers === "number" ? currentFollowers : null}
+          snapshots={live.history}
+          syncedAt={live.updatedAt?.toISOString() ?? null}
+          hasMoreStored={live.hasNext}
+          remoteBackfillComplete={historyComplete}
+          loading={live.loading || live.loadingMore}
+          onLoadAllStored={async () => {
+            const fetched = await live.loadAllForCsv();
+            return toRows("facebook", fetched.instagram, fetched.facebook).filter(
+              (row) => (!from || row.date >= from) && (!to || row.date <= to)
+            );
+          }}
+        />
       )}
 
       <section className={`${p}-panel`}>
